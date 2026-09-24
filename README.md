@@ -1,6 +1,8 @@
 # jev-seatbelts
 
-[Watch the intro](docs/media/jev-seatbelts-intro.mp4) - a hand-drawn
+[![Watch the intro](docs/images/hero-thumbnail.png)](docs/media/jev-seatbelts-intro.mp4)
+
+A hand-drawn
 test-results trend line climbs, Jev rides it to the top, bursts
 through the chart, and jumps into a bus full of buckled-in agents for
 a lap at speed.
