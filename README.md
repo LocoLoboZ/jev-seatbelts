@@ -2,11 +2,6 @@
 
 [![Watch the intro](docs/images/hero-thumbnail.png)](docs/media/jev-seatbelts-intro.mp4)
 
-A hand-drawn
-test-results trend line climbs, Jev rides it to the top, bursts
-through the chart, and jumps into a bus full of buckled-in agents for
-a lap at speed.
-
 Your AI coding agent is quick, confident, and every now and then about
 as careful as a wombat behind the wheel of a stolen ute. It'll happily
 install a package that doesn't exist, `rm` something it can't get
