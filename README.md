@@ -1,6 +1,9 @@
 # jev-seatbelts
 
-[![Watch the intro](docs/images/hero-thumbnail.png)](https://github.com/user-attachments/assets/3e3f327d-c464-4319-80c1-6e35ab1306a7)
+![Watch the intro](docs/images/hero-thumbnail.png)
+
+<!-- markdownlint-disable-next-line MD034 -->
+https://github.com/user-attachments/assets/3e3f327d-c464-4319-80c1-6e35ab1306a7
 
 Your AI coding agent is quick, confident, and every now and then about
 as careful as a wombat behind the wheel of a stolen ute. It'll happily
