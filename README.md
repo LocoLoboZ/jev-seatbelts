@@ -1,5 +1,6 @@
 # jev-seatbelts
 
+<!-- markdownlint-disable-next-line MD034 -->
 https://github.com/user-attachments/assets/3e3f327d-c464-4319-80c1-6e35ab1306a7
 
 Your AI coding agent is quick, confident, and every now and then about
