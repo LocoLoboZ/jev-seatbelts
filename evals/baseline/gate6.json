@@ -1,0 +1,68 @@
+{
+  "suite": "gate6",
+  "ts": "2026-09-24T17:59:19",
+  "n": 8,
+  "correct": 8,
+  "cases": {
+    "an unrelated trivial commit earns no findings": {
+      "expected": [],
+      "got": []
+    },
+    "seam-reality: a new ABC-based class with no other implementer": {
+      "expected": [
+        "seam-reality"
+      ],
+      "got": [
+        "seam-reality"
+      ]
+    },
+    "interface-test-surface: a test imports a private symbol directly": {
+      "expected": [
+        "dependency-category",
+        "interface-test-surface"
+      ],
+      "got": [
+        "dependency-category",
+        "interface-test-surface"
+      ]
+    },
+    "test-layering: a new test lands beside an untouched sibling": {
+      "expected": [
+        "test-layering"
+      ],
+      "got": [
+        "test-layering"
+      ]
+    },
+    "dependency-category: a new true-external import": {
+      "expected": [
+        "dependency-category"
+      ],
+      "got": [
+        "dependency-category"
+      ]
+    },
+    "health-delta: branch points added to an existing file": {
+      "expected": [
+        "health-delta"
+      ],
+      "got": [
+        "health-delta"
+      ]
+    },
+    "consequence-scoping: a file crosses the hot-spot commit threshold": {
+      "expected": [
+        "consequence-scoping"
+      ],
+      "got": [
+        "consequence-scoping"
+      ]
+    },
+    "depth: a substantial new module, judged live": {
+      "expected": "judged",
+      "got": [
+        "depth"
+      ]
+    }
+  }
+}

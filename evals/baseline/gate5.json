@@ -1,0 +1,36 @@
+{
+  "suite": "gate5",
+  "ts": "2026-09-22T20:29:59",
+  "n": 3,
+  "correct": 3,
+  "unranked": 0,
+  "cases": {
+    "concurrent cache write race": {
+      "expected": "cause",
+      "got": "cause",
+      "ranked": [
+        "cause",
+        "distractor2",
+        "distractor1"
+      ]
+    },
+    "off-by-one in pagination": {
+      "expected": "cause",
+      "got": "cause",
+      "ranked": [
+        "cause",
+        "distractor2",
+        "distractor1"
+      ]
+    },
+    "stale config after deploy": {
+      "expected": "cause",
+      "got": "cause",
+      "ranked": [
+        "cause",
+        "distractor2",
+        "distractor1"
+      ]
+    }
+  }
+}

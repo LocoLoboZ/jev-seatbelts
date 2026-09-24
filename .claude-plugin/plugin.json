@@ -1,0 +1,9 @@
+{
+  "name": "jev-seatbelts",
+  "description": "Seven Claude Code hooks that gate risky agent behaviour - bad packages, destructive commands, leaked secrets, guessed fixes, sloppy diffs, and unverified 'done' claims - using deterministic checks first and TypeSafe's Jev model only for the residual, ambiguous cases.",
+  "version": "0.2.0",
+  "author": {
+    "name": "QalatCyber"
+  },
+  "hooks": "./hooks/hooks.json"
+}

@@ -1,0 +1,6 @@
+{
+  "config": {
+    // Tables and fenced code cannot be wrapped without breaking them.
+    "MD013": { "line_length": 80, "tables": false, "code_blocks": false }
+  }
+}

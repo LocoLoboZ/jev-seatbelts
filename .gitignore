@@ -1,0 +1,11 @@
+evals/results/
+evals/attacks/
+__pycache__/
+*.pyc
+
+# Local gate registration. Machine-specific, never shipped. Covered by a
+# global ignore on this machine, which does not travel with the repository.
+.claude/settings.local.json*
+
+# Local Codex CLI hook wiring, machine-specific paths, never shipped.
+.codex/

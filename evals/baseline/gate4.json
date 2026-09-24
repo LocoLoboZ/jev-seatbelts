@@ -1,0 +1,55 @@
+{
+  "suite": "gate4",
+  "ts": "2026-09-22T18:17:04",
+  "n": 9,
+  "correct": 9,
+  "missed": 0,
+  "noisy": 0,
+  "cases": {
+    "a clean commit is silently allowed": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "jev-judged-clean"
+    },
+    "a github token staged for commit is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "secret-github-token"
+    },
+    "removing a line with an old secret is not a new leak": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "jev-risk-tier"
+    },
+    "a non-commit command is untouched even with a dirty tree": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": null
+    },
+    "a chained git add && git commit is still screened": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "secret-aws-access-key"
+    },
+    "-a catches a tracked change that was never staged": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "secret-aws-access-key"
+    },
+    "a private key block is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "secret-private-key-block"
+    },
+    "a secret-shaped commit message is not screened, only the diff is": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "jev-judged-clean"
+    },
+    "phase 2: a commit touching a named risk path is actually judged live": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-risk-tier"
+    }
+  }
+}

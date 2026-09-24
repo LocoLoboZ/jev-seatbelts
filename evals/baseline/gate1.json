@@ -1,0 +1,88 @@
+{
+  "suite": "gate1",
+  "ts": "2026-09-24T17:16:27",
+  "n": 10,
+  "correct": 10,
+  "missed": 0,
+  "noisy": 0,
+  "cases": {
+    "a one-line fix: trivial work class, allowed with no check run": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "trivial-work-class",
+      "j_probs": null
+    },
+    "an empty plan is not resolved": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "empty-plan",
+      "j_probs": null
+    },
+    "too many unresolved [NEEDS CLARIFICATION] markers: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "too-many-unresolved-questions",
+      "j_probs": null
+    },
+    "a TODO placeholder remains: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "placeholder-remaining",
+      "j_probs": null
+    },
+    "no falsifiable outcome anywhere: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "no-falsifiable-outcome",
+      "j_probs": null
+    },
+    "a named artefact does not resolve: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "named-artefact-unresolved",
+      "j_probs": null
+    },
+    "an override asserted but incomplete: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "override-incomplete",
+      "j_probs": null
+    },
+    "an unquantified adjective, otherwise clean: needs clarification": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "needs-clarification",
+      "j_probs": {
+        "j1_goal_mismatch": 0.5,
+        "j2_oversized": 0.22,
+        "j3_contradiction": 0.11,
+        "j4_stack_confidence": 0.17,
+        "j5_unfalsifiable": 0.67
+      }
+    },
+    "no proof command, otherwise clean: needs clarification": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "jev-judged-low-stack-confidence",
+      "j_probs": {
+        "j1_goal_mismatch": 0.48,
+        "j2_oversized": 0.11,
+        "j3_contradiction": 0.06,
+        "j4_stack_confidence": 0.1,
+        "j5_unfalsifiable": 0.38
+      }
+    },
+    "a fully clean, real feature plan: judged live": {
+      "expected": "judged",
+      "got": "ask",
+      "rule": "jev-judged-low-stack-confidence",
+      "j_probs": {
+        "j1_goal_mismatch": 0.5,
+        "j2_oversized": 0.19,
+        "j3_contradiction": 0.08,
+        "j4_stack_confidence": 0.15,
+        "j5_unfalsifiable": 0.39
+      }
+    }
+  }
+}

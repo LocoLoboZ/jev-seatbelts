@@ -1,0 +1,585 @@
+{
+  "suite": "gate3",
+  "ts": "2026-09-22T17:36:55",
+  "n": 115,
+  "correct": 115,
+  "missed": 0,
+  "noisy": 0,
+  "cases": {
+    "REGRESSION python script that prints the dangerous string": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REGRESSION appending documentation that quotes it": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REGRESSION writing a JSON file that contains it": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REGRESSION git rm --cached deletes nothing on disk": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REGRESSION grepping the docs for the string": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "recursive delete of the filesystem root": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "recursive delete of home": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "recursive delete of $HOME": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "sudo does not hide the target": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "formatting a filesystem": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "format-filesystem"
+    },
+    "writing over a block device": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "overwrite-block-device"
+    },
+    "fork bomb": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "fork-bomb"
+    },
+    "danger inside a substitution is lifted out and seen": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "deleting the settings file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "overwriting the local settings file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "removing a git hook": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "appending to a shell rc file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "editing the settings file with a tool": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "recursive delete of /opt is denied by the widened floor": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "force push naming main is denied by the widened floor": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "force push naming master is denied by the widened floor": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "force push naming production is denied by the widened floor": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "deleting a namespace is denied by the widened floor": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "kubectl-delete-namespace"
+    },
+    "deleting a namespace via the ns alias is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "kubectl-delete-namespace"
+    },
+    "deleting a protected branch via push is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-delete-protected-branch"
+    },
+    "deleting a protected branch via an empty-source refspec is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-delete-protected-branch"
+    },
+    "force push with --all is denied, it touches every branch": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "force push with --tags is denied, it touches every tag": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "deleting a cluster node is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "kubectl-delete-node"
+    },
+    "deleting a persistent volume claim is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "kubectl-delete-pvc"
+    },
+    "a prune with --volumes also destroys data, denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "container-prune-volumes"
+    },
+    "compose down -v deletes volumes, denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "compose-down-volumes"
+    },
+    "an unscoped terraform destroy is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "terraform-destroy"
+    },
+    "a scoped terraform destroy is still judged": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "deleting a non-protected branch via push is unaffected": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "the leading + shorthand for force is not just the --force flag": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "+ shorthand on a src:dst refspec is force too": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "a fully-qualified refs/heads/ name is still a protected branch": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-delete-protected-branch"
+    },
+    "deleting a protected branch by its qualified name is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-delete-protected-branch"
+    },
+    "force-pushing a qualified protected branch name is denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "git-force-push-protected"
+    },
+    "pushing local main onto an unprotected remote branch is not the same as overwriting remote main": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "a separated -n value is not the resource kind": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "kubectl-delete-node"
+    },
+    "a namespace merely named after a protected kind is not that kind": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "s3 rb --force deletes a bucket and everything in it": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-s3-force-delete-bucket"
+    },
+    "s3 rb without --force is unaffected, it fails on a non-empty bucket": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "rds delete with --skip-final-snapshot takes no backup": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-rds-delete-no-snapshot"
+    },
+    "rds delete naming a final snapshot is unaffected, it takes a backup": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "ec2 delete-vpc destroys a whole network": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-ec2-delete-vpc"
+    },
+    "a global flag before the subcommand is not the subcommand": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-ec2-delete-vpc"
+    },
+    "eks delete-cluster removes a whole control plane": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-eks-delete-cluster"
+    },
+    "dynamodb delete-table is a routine dev/test teardown, unaffected": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "gcloud projects delete removes a whole project": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-projects-delete"
+    },
+    "gcloud sql instances delete removes a whole database": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-sql-delete"
+    },
+    "gcloud container clusters delete removes a whole GKE cluster": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-gke-delete-cluster"
+    },
+    "gcloud compute networks delete removes a whole VPC network": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-delete-network"
+    },
+    "a gcloud global flag before the subcommand is not the subcommand": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-delete-network"
+    },
+    "az group delete removes a whole resource group": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "az-group-delete"
+    },
+    "an az short global flag before the subcommand is not the subcommand": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "az-group-delete"
+    },
+    "az aks delete removes a whole Kubernetes cluster": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "az-aks-delete"
+    },
+    "az sql server delete removes every database on the server": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "az-sql-server-delete"
+    },
+    "az sql db delete is a routine single-database delete, unaffected": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "az's own -s subscription shortcut must not shift the subcommand": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "az-group-delete"
+    },
+    "a global flag not on any hardcoded list is still not the subcommand": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "aws-s3-force-delete-bucket"
+    },
+    "same for a gcloud global flag no hardcoded list would have named": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "gcloud-projects-delete"
+    },
+    "base64 decoded into a shell": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "eval of a variable": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "sourcing a script": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "the verb itself is a variable": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "IFS-style indirection": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "xargs takes the verb from stdin": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "find -exec runs what it matches": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "find -delete": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "an installer piped into a shell": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "an interpreter given code on the command line": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "a delete whose target is a variable": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "a delete whose target is a glob": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "unbalanced quoting is never resolved": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "unparseable"
+    },
+    "past the segment cap": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "unparseable"
+    },
+    "recursive delete of a real directory": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "force push to a non-protected branch is still judged": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "hard reset": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "discarding the working tree": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "git clean": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "dropping a table": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "deleting a cluster resource": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "docker prune": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "REVIEW sudo with an option value": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW timeout with a duration": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW env with an absolute path": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW the command builtin": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW the exec builtin": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW shell control words hide the verb": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW substitution inside a parameter expansion": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW substitution inside an arithmetic expansion": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "delete-machine-scope"
+    },
+    "REVIEW the nesting cap applies inside an expansion": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "unparseable"
+    },
+    "REVIEW a variable redirect target is still the settings file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "REVIEW a dot component does not hide the settings file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "REVIEW a double slash does not hide the settings file": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "self-protection"
+    },
+    "REVIEW combined interpreter flags still supply code": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "REVIEW git global options do not hide the subcommand": {
+      "expected": "judged",
+      "got": "deny",
+      "rule": "jev-judged"
+    },
+    "REVIEW an expansion anywhere is unresolved": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "REVIEW reading an rc file is not writing to it": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REVIEW backing up an rc file is not writing to it": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REVIEW searching for the word mkfs is not running it": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REVIEW a quoted heredoc body is data, not shell": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "REVIEW an unreadable command is never allowed": {
+      "expected": "ask",
+      "got": "ask",
+      "rule": "unreadable-input"
+    },
+    "listing files": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "a commit": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "a chained commit and test run": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "force push with a lease": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "clearing node_modules": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "clearing a nested build directory": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "a directory that merely ends in node_modules is not one": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged"
+    },
+    "deleting one file": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "resolved-safe"
+    },
+    "a tool this gate has no opinion about": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": null
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "config": {
+    // rules.md is a data file. Each "- " line is one rule sent verbatim to
+    // Jev, so a rule cannot be wrapped without changing what is asked.
+    "MD013": false
+  },
+  "globs": ["rules.md"]
+}

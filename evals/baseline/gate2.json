@@ -1,0 +1,55 @@
+{
+  "suite": "gate2",
+  "ts": "2026-09-24T06:49:04",
+  "n": 9,
+  "correct": 9,
+  "missed": 0,
+  "noisy": 0,
+  "cases": {
+    "not an install at all: untouched": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "not-an-install"
+    },
+    "npm install with no target names nothing": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "not-an-install"
+    },
+    "a fabricated npm name does not exist: denied, no jev call needed": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "package-not-found"
+    },
+    "a fabricated PyPI name does not exist: denied": {
+      "expected": "deny",
+      "got": "deny",
+      "rule": "package-not-found"
+    },
+    "a real, well-known npm package: judged live": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged-clean"
+    },
+    "a real, well-known PyPI package: judged live": {
+      "expected": "judged",
+      "got": "allow",
+      "rule": "jev-judged-clean"
+    },
+    "a local path is not a registry lookup target": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "not-an-install"
+    },
+    "a VCS URL is not a registry lookup target": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "not-an-install"
+    },
+    "pip's -r value is not read as a package name": {
+      "expected": "allow",
+      "got": "allow",
+      "rule": "not-an-install"
+    }
+  }
+}
