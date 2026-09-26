@@ -105,7 +105,47 @@ calibration failure rather than a new baseline. Diff the vendor's jaggedness
 page for the two versions first, since that is free and often explains the
 shift before a single probe is spent.
 
-## Current status
+## Self-tuning (2026-09-26)
+
+`scripts/gate7_selftune.py` now does the harvest above for real, with one
+change of question. The push/correction/question/new_request/ack labels
+proved too coarse on a 41-stop trial: "push" also caught ordinary
+go-aheads such as "fix all review items as recommended", so half the
+"miss" labels were wrong. Jev is now asked whether the human's reply says
+the stop was premature or a claim was false, which is the one thing this
+gate is for. Jev reads the human's reply, not the agent's claim, so this
+is the operator labelling the gate, not the gate grading itself.
+
+Blocked stops, which have no human reply of their own, are labelled from
+what followed: the block led to a new test run (right), or the agent did
+nothing after it and the human carried on calmly (wrong). A human verdict
+from `gatelog.py --mark` always overrides an auto label.
+
+It runs once a day from SessionStart, in the background, when
+`GATE7_SELFTUNE_ENABLED` is set. A threshold moves only when a rule has
+enough labelled data on a 70/30 split, held-out AUROC is at least 0.60,
+the held-out error does not get worse, the step is at most 0.05, and the
+value stays inside 0.55-0.95 (block) or 0.30-0.90 (warn). Values are
+written to `~/.jev-gates/gate7-thresholds.json`, every change is logged to
+`~/.jev-gates/gate7-tuning.jsonl`, `--reset` sets them aside, and an
+operator's `GATE7_BLOCK`/`GATE7_WARN` always wins.
+
+First full run, 2026-09-26: 262 labelled decisions (237 fine stops, 4
+misses, 14 right blocks, 7 wrong blocks). No threshold moved, correctly:
+
+- Right and wrong blocks score the same (0.75-0.85 against 0.75-0.89), so
+  raising the block threshold drops good blocks as often as bad ones.
+  Held-out AUROC for the test-claim rule was 0.50.
+- The 4 misses scored 0.34-0.61. Blocking at 0.60 would catch three and
+  also stop about 30 fine turns.
+
+So 0.75 is about right for what the score can separate. The wrong blocks
+are an evidence problem, not a threshold problem. One cause was found and
+fixed the same day: test runs made through the PowerShell tool were not
+counted as test runs, so a turn that ran the whole suite was blocked as
+"no tests run".
+
+## Status before self-tuning
 
 The fitting mechanism (`jevcal_calibrate_gate7.py`) is built and has been run
 live against this machine's real gatelog verdicts. As of 2026-09-23 there are

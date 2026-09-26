@@ -223,10 +223,10 @@ def is_commit(command):
     saw_add = False
     for seg in segments:
         name, args = seg.command()
-        if name != "git":
+        if jevgate.bare_command(name) != "git":
             continue
         texts = [w.text for w in args]
-        sub = next((t for t in texts if not t.startswith("-")), None)
+        sub = jevgate.git_subcommand(texts)
         if sub == "add":
             saw_add = True
             continue
@@ -775,8 +775,7 @@ def jev_judge(new_files, ambiguous, budget=None, session_id=None):
     answers = res.get("answers") or {}
     depth_out = []
     for i, (path, _snippet) in enumerate(depth_files):
-        p = (answers.get(f"depth_{i}") or {}).get("noul")
-        p = float(p) if isinstance(p, (int, float)) else None
+        p = jevgate.noul_p(answers, f"depth_{i}")
         # Fires on a SHALLOW judgment (p = probability deleting it would
         # just move complexity elsewhere) - see the polarity fix above.
         if p is not None and p >= DEPTH_THRESHOLD:
@@ -788,8 +787,7 @@ def jev_judge(new_files, ambiguous, budget=None, session_id=None):
                 path))
     surface_out = []
     for i, (path, lineno, name, _line_text) in enumerate(surface_hits):
-        p = (answers.get(f"surface_{i}") or {}).get("noul")
-        p = float(p) if isinstance(p, (int, float)) else None
+        p = jevgate.noul_p(answers, f"surface_{i}")
         if p is not None and p >= SURFACE_THRESHOLD:
             surface_out.append(Result(
                 "interface-test-surface", "worth-exploring",
@@ -970,10 +968,7 @@ def main():
     global _HOOK
     hook = json.load(sys.stdin)
     _HOOK = hook if isinstance(hook, dict) else {}
-    if _HOOK.get("tool_name") != "Bash":
-        return 0
-    tool_input = _HOOK.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    command = jevgate.shell_command(_HOOK, jevgate.GIT_COMMIT_HINT)
     if command is None:
         return 0
     budget = jevgate.Budget(HOOK_BUDGET_MS)

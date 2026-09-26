@@ -43,10 +43,10 @@ review history - nothing here is a marketing number.
 
 | What was checked | Result |
 | --- | --- |
-| Automated test scenarios, all 7 gates combined | 163 / 163 passing (100%) |
+| Automated test scenarios, all 7 gates combined | 176 / 176 passing (100%) |
 | Independent adversarial review rounds on the highest-risk gate (command safety) | 11 rounds, converging to zero findings |
 | Findings from the most recent independent review, confirmed real and fixed before merge | 5 of 6 flagged issues |
-| Commits from first line to today, no single mega-commit hiding the work | 98 |
+| Commits from first line to today, no single mega-commit hiding the work | 121 |
 | Gate still awaiting a real production track record before its threshold is trusted | 1 of 7 (Gate 7 - flagged honestly below, not buried) |
 
 "She'll be right" is not a test result. These are.
@@ -60,24 +60,26 @@ actually found.
 
 ## Status
 
-All seven gates are built. Read this before installing.
+All seven gates are built. Read this before installing - it's the fine
+print, but it's short, and none of it is hidden in a footnote.
 
 | Gate | Catches | State |
 | --- | --- | --- |
 | 1 Plan check | A plan that reads fine but solves the wrong problem, contradicts itself, or has no falsifiable success criterion | Built, adversarially reviewed |
 | 2 Package check | A hallucinated or mistyped package, a typosquat, an abandoned package | Built. Public registries only (npm, PyPI); cargo/go/gem not covered |
-| 3 Command safety | An unreviewed force-push, mass delete, `DROP TABLE`, or other hard-to-reverse command | Built, deterministic, no model call |
+| 3 Command safety | An unreviewed force-push, mass delete, `DROP TABLE`, or other hard-to-reverse command | Built. Deterministic parser first, Jev only for a command the parser cannot resolve |
 | 4 Commit screening | A hardcoded secret or backdoor-looking diff about to be committed | Built, both phases |
-| 5 Debug triage | A guessed fix tried without a falsifiable root-cause hypothesis | Built (the one phase that needs a model call; the rest of the discipline is unscripted process) |
+| 5 Debug triage | A guessed fix tried without a falsifiable root-cause hypothesis | Built (the one phase that needs a model call, the rest of the discipline is unscripted process). Plus a no-model stall check hook that warns when three edits in a row leave the same test failure unchanged |
 | 6 Code quality | Sloppy work that still compiles - measures, never blocks | Built, adversarially reviewed |
 | 7 Completion check | A "done"/"tests pass" claim with no fresh evidence behind it | Built. **Threshold is a placeholder, not calibrated - see below** |
 
-- **Every gate is off until you switch it on.** Each reads its own
-  `GATEn_ENABLED` environment variable at the top of its hook; installing
-  this plugin does nothing on its own. Set the ones you want:
+- **Every gate is off until you switch it on.** Installing this does
+  nothing on its own, like a smoke alarm still in the box. Each gate
+  waits for its own `GATEn_ENABLED` environment variable. Set the ones
+  you want:
   `GATE1_ENABLED`, `GATE2_ENABLED`, `GATE3_ENABLED`, `GATE4_ENABLED`,
-  `GATE6_ENABLED`, `GATE7_ENABLED`. Gate 5 has no hook - see its own
-  `SKILL.md`.
+  `GATE6_ENABLED`, `GATE7_ENABLED`. Gate 5's ranker has no hook - see its
+  own `SKILL.md` - but its stall check does: `GATE5_STALL_ENABLED`.
 - **Gate 7's threshold is a guess, not a fitted number.** The 0.75
   block / 0.50 warn placeholders have not been calibrated against real
   history yet. In the baseline run, one failing case scored exactly on
@@ -86,10 +88,10 @@ All seven gates are built. Read this before installing.
 - **Gate 2 only knows public registries.** A private or internal package
   looks identical to a hallucinated one to a registry lookup - it will be
   denied too. See `skills/package-check/SKILL.md`, "Known gaps".
-- **Gate 3 is a speed bump, not a boundary.** A denylist cannot be made
-  sound at any level of shell parsing, in any language. The OS sandbox and
-  the permissions of the account running Claude Code are the real
-  boundary. Known gaps are numbered in
+- **Gate 3 is a speed bump, not a boundary.** A list of banned commands
+  can never catch every way to write a command, in any shell. The real
+  wall is the sandbox and the permissions of the account running Claude
+  Code. Known gaps are numbered in
   `skills/command-safety/references/RESIDUAL-RISKS.md`.
 - **The gates have not been proven working together on a real session
   yet.** `evals/eval_pipeline.py` runs one realistic debugging-to-commit
@@ -97,6 +99,14 @@ All seven gates are built. Read this before installing.
   Gate 3's allow, Gate 4's allow, and Gate 7's block all land correctly in
   sequence - run it and read the result before trusting the pipeline as a
   whole, not just each gate's own isolated eval.
+- **PowerShell is covered, with known limits.** Windows folk get the
+  same seatbelt. Gate 3 reads every command run through Claude Code's
+  PowerShell tool with a PowerShell reader of its own, so
+  `Remove-Item -Recurse -Force C:\` meets the same checks as `rm -rf /`,
+  aliases and shortened parameter names included. Gates 2, 4 and 6 check
+  a PowerShell command when it names their topic (`git ... commit`, or a
+  package install). What still escapes is listed under RR-18 in
+  `skills/command-safety/references/RESIDUAL-RISKS.md`.
 - **Developed and tested on Windows.** The key lookup falls back to the
   Windows user registry. Nothing here is deliberately Windows-only, but
   nothing has been verified on macOS or Linux either.
@@ -113,10 +123,12 @@ python install.py
 
 Adds the seven gates and the drift check as hooks in your global
 `~/.claude/settings.json`, alongside whatever is already there - nothing
-existing is touched or reordered. Every gate stays off until you set its
+else is changed, though this plugin's own entries move to the end of each
+hook event when they are refreshed. Every gate stays off until you set its
 own `GATEn_ENABLED` variable (see "Status" above). Safe to run more than
-once: it checks for its own path first and does nothing if already
-installed.
+once: it adds only the hooks and flags not already there, so re-running
+after an upgrade picks up a newly added gate, and a flag you set to 0
+stays 0.
 
 ```console
 python install.py --dry-run    # show what would change, change nothing
@@ -157,9 +169,10 @@ own evidence, before trusting either.
 - A [TypeSafe](https://typesafe.ai) Jev API key, needed by the gate evals
   that make live calls and by every gate's Jev-judged tier once its
   `GATEn_ENABLED` is set. The offline checks below need no key and no
-  network. With no key found, every gate logs the gap and fails open (Gate
-  3 is the one exception: it makes no model call at all, so a missing key
-  never affects it).
+  network. With no key found, every gate logs the gap and fails open, with
+  one exception: Gate 3's fixed floor needs no key, but a command that
+  reaches its Jev-judged tier is denied when no judgement can be had
+  (set `GATE3_JEV_FAIL_OPEN=1` to change that).
 
 The key is read from `TYPESAFE_API_KEY`, or on Windows from the user
 registry when a hook does not inherit user variables. No key is stored in
@@ -172,6 +185,7 @@ this repository.
 | `install.py` | One-command install/uninstall of the gates as global Claude Code hooks |
 | `lib/jevgate.py` | Shared plumbing every gate uses: key lookup, transcript parsing, thresholds, the Jev call with retry, logging, session-wide call budget |
 | `lib/bashparse.py` | The quote-aware shell reader behind Gate 3: word provenance, lifted substitutions, caps that fail closed |
+| `lib/psparse.py` | The PowerShell reader behind Gate 3: turns a PowerShell command into the same pieces `bashparse.py` produces, and refuses what it cannot read |
 | `lib/findings.py` | The shared SARIF finding store. Gates 3, 4, 5 and 6 write to it, Gate 7 reads it |
 | `lib/evalharness.py` | Runs a gate's eval cases, stores a dated result, diffs against the stored baseline |
 | `lib/gatelog.py` | Adjudicates logged gate decisions and computes escape rate and false-block rate |
@@ -190,29 +204,25 @@ Every offline check (no key, no network needed):
 ```console
 python lib/jevgate.py
 python lib/bashparse.py
+python lib/psparse.py
 python lib/findings.py
 python lib/gatelog.py
 python lib/gate_status.py
 python lib/bypass.py
 python lib/evalharness.py
+python lib/driftguard.py
+python lib/driftcheck_hook.py --selfcheck
 python skills/plan-gate/scripts/plan_gate.py --selfcheck
 python skills/command-safety/scripts/command_safety.py --selfcheck
 python skills/completion-check/scripts/completion_check.py --selfcheck
+python skills/completion-check/scripts/gate7_selftune.py --selfcheck
 python skills/commit-screening/scripts/commit_screening.py --selfcheck
 python skills/package-check/scripts/package_check.py --selfcheck
 python skills/code-quality/scripts/code_quality.py --selfcheck
-python skills/command-safety/scripts/eval_gate3.py
-python skills/commit-screening/scripts/eval_gate4.py
 python skills/debug-triage/scripts/hypothesis_ranker.py --selfcheck
 python skills/debug-triage/scripts/pattern_sizer.py --selfcheck
+python skills/debug-triage/scripts/stall_check.py --selfcheck
 ```
-
-Gate 3's and Gate 4's evals are in that list because neither *needs* a key
-or a network to run at all - every fixed-floor case in each stays fully
-offline regardless. On a machine with a real key configured, both gates'
-`judged` cases DO make real calls: Gate 3's Jev-judged tier and Gate 4's
-phase 2 tier. See each gate's own `SKILL.md` for what a `judged` case
-checks and why.
 
 `package_check.py --selfcheck` is offline (the registry lookup itself is
 mocked), but Gate 2's own eval, `eval_gate2.py`, always makes a live
@@ -224,15 +234,22 @@ Every check that needs a real Jev key:
 ```console
 python skills/plan-gate/scripts/eval_gate1.py
 python skills/package-check/scripts/eval_gate2.py
+python skills/command-safety/scripts/eval_gate3.py
+python skills/commit-screening/scripts/eval_gate4.py
 python skills/code-quality/scripts/eval_gate6.py
 python skills/completion-check/scripts/eval_gate7.py
 python skills/debug-triage/scripts/eval_gate5.py
 python evals/eval_pipeline.py
 ```
 
-Gate 5's eval needs a key for every case - unlike Gates 3 and 4, phase 3
-has no fixed-floor tier that can pass offline; ranking hypotheses is the
-whole of what it does.
+Gate 3's and Gate 4's evals are mostly fixed-rule cases that need no
+key. Their `judged` cases make a live Jev call, and each one checks the
+answer really came from Jev. With no key, those cases fail on purpose
+rather than pass quietly. A test that passes because nobody was home is
+not a test. See each gate's own `SKILL.md` for the detail.
+
+Gate 5's eval needs a key for every case. It has no fixed-rule tier at
+all - ranking hypotheses is the whole of what it does.
 
 ## Reference
 

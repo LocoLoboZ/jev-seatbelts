@@ -119,8 +119,7 @@ def size(justification, budget=None, session_id=None):
         jevgate.mark_jev_unreachable(session_id, GATE, str(exc))
         jevgate.hook_error(GATE, f"jev call failed: {exc}")
         return _fallback("jev call failed")
-    p = (res.get("answers") or {}).get("parallel", {}).get("noul")
-    p = float(p) if isinstance(p, (int, float)) else None
+    p = jevgate.noul_p(res.get("answers"), "parallel")
     if p is None:
         return _fallback("jev returned no usable score")
     if p >= PARALLEL_THRESHOLD:

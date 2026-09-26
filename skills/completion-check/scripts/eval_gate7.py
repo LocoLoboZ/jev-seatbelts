@@ -11,7 +11,9 @@ which is why four of the nine cases below are built to look like violations
 and must still be allowed.
 """
 import os
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), *[os.pardir] * 3, "lib"))
@@ -86,5 +88,30 @@ CASES = [
 ]
 
 
+def fixture_repo(path):
+    """A throwaway repo with one committed file and one uncommitted edit.
+
+    Gate 7 reads `git status` and `git diff` of the session's cwd as
+    evidence. Run in this repository, the "never committed" case scored
+    0.88 with a dirty tree and 0.56 with a clean one, so the result
+    depended on whatever the developer had not committed yet. A fixed
+    fixture makes the evidence the same on every run."""
+    def git(*args):
+        subprocess.run(("git", "-c", "user.name=eval", "-c",
+                        "user.email=eval@example.invalid") + args,
+                       cwd=path, check=True, capture_output=True)
+    readme = os.path.join(path, "README.md")
+    git("init", "-q")
+    with open(readme, "w", encoding="utf-8") as f:
+        f.write("# demo\n\nThe retyr helper.\n")
+    git("add", "README.md")
+    git("commit", "-q", "-m", "init")
+    with open(readme, "w", encoding="utf-8") as f:
+        f.write("# demo\n\nThe retry helper.\n")
+
+
 if __name__ == "__main__":
-    sys.exit(evalharness.run_suite("gate7", CASES, HOOK, "GATE7_LOG"))
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as repo:
+        fixture_repo(repo)
+        sys.exit(evalharness.run_suite("gate7", CASES, HOOK, "GATE7_LOG",
+                                       cwd=repo))

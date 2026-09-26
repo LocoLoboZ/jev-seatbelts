@@ -22,7 +22,9 @@ import sys
 
 SETTINGS = os.path.expanduser("~/.claude/settings.json")
 REPO = os.path.dirname(os.path.abspath(__file__))
-GATE_ENV = [f"GATE{n}_ENABLED" for n in (1, 2, 3, 4, 6, 7)] + ["DRIFTGUARD_ENABLED"]
+GATE_ENV = ([f"GATE{n}_ENABLED" for n in (1, 2, 3, 4, 6, 7)]
+            + ["GATE5_STALL_ENABLED", "GATE7_SELFTUNE_ENABLED",
+               "DRIFTGUARD_ENABLED"])
 
 
 def _cmd(rel):
@@ -38,18 +40,23 @@ PRETOOLUSE = [
     {"matcher": "ExitPlanMode", "hooks": [_hook(
         "skills/plan-gate/scripts/plan_gate.py", 30,
         "jev-seatbelts Gate 1: checking the plan")]},
-    {"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit", "hooks": [_hook(
+    {"matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit", "hooks": [_hook(
         "skills/command-safety/scripts/command_safety.py", 10,
         "jev-seatbelts Gate 3: checking the command")]},
-    {"matcher": "Bash", "hooks": [_hook(
+    {"matcher": "Bash|PowerShell", "hooks": [_hook(
         "skills/commit-screening/scripts/commit_screening.py", 10,
         "jev-seatbelts Gate 4: checking the commit")]},
-    {"matcher": "Bash", "hooks": [_hook(
+    {"matcher": "Bash|PowerShell", "hooks": [_hook(
         "skills/package-check/scripts/package_check.py", 10,
         "jev-seatbelts Gate 2: checking the package")]},
-    {"matcher": "Bash", "hooks": [_hook(
+    {"matcher": "Bash|PowerShell", "hooks": [_hook(
         "skills/code-quality/scripts/code_quality.py", 30,
         "jev-seatbelts Gate 6: measuring code quality")]},
+]
+POSTTOOLUSE = [
+    {"matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit", "hooks": [_hook(
+        "skills/debug-triage/scripts/stall_check.py", 10,
+        "jev-seatbelts Gate 5: stall check")]},
 ]
 STOP = [{"hooks": [_hook(
     "skills/completion-check/scripts/completion_check.py", 30,
@@ -59,9 +66,14 @@ SUBAGENTSTOP = [{"hooks": [_hook(
     "jev-seatbelts Gate 7: checking the completion claim")]}]
 SESSIONSTART = [{"hooks": [_hook(
     "lib/driftcheck_hook.py", 30,
-    "jev-seatbelts: checking Jev's own judgment still looks right")]}]
+    "jev-seatbelts: checking Jev's own judgment still looks right")]},
+    {"hooks": [dict(_hook(
+        "skills/completion-check/scripts/gate7_selftune.py", 10,
+        "jev-seatbelts Gate 7: daily self-tune check"),
+        command=_cmd("skills/completion-check/scripts/gate7_selftune.py")
+        + " --if-due")]}]
 
-BLOCKS = {"PreToolUse": PRETOOLUSE, "Stop": STOP,
+BLOCKS = {"PreToolUse": PRETOOLUSE, "PostToolUse": POSTTOOLUSE, "Stop": STOP,
           "SubagentStop": SUBAGENTSTOP, "SessionStart": SESSIONSTART}
 
 
@@ -101,32 +113,52 @@ def installed(settings):
                for entry in block)
 
 
-def install(dry_run=False):
-    settings = _load()
-    if installed(settings):
-        print("already installed (found a hook pointing at this repo) - "
-              "no change made")
-        return 0
+def _commands(entry):
+    return {h.get("command") for h in entry.get("hooks", [])}
 
-    added_hooks = 0
-    settings.setdefault("hooks", {})
+
+def install(dry_run=False):
+    """Brings this repo's own hook entries to exactly the current set, per
+    event: a newly added gate is added, an existing entry whose matcher or
+    timeout changed in an upgrade is replaced, and nothing that is not
+    this repo's is touched. Only env flags not already set are added, so a
+    flag the operator set to 0 stays 0. A run that would change nothing
+    says so and writes nothing."""
+    settings = _load()
+    hooks = settings.setdefault("hooks", {})
+    added = updated = 0
+    changed_events = []
     for event, entries in BLOCKS.items():
-        settings["hooks"].setdefault(event, []).extend(entries)
-        added_hooks += len(entries)
+        block = hooks.setdefault(event, [])
+        mine = [e for e in block if _is_ours(e)]
+        if mine == entries:
+            continue
+        have = set().union(*(_commands(e) for e in mine))
+        new = sum(1 for e in entries if not _commands(e) <= have)
+        added += new
+        updated += sum(1 for e in entries
+                       if _commands(e) <= have and e not in mine)
+        hooks[event] = [e for e in block if not _is_ours(e)] + entries
+        changed_events.append(event)
 
     settings.setdefault("env", {})
     added_env = [k for k in GATE_ENV if k not in settings["env"]]
-    settings["env"].update({k: "1" for k in GATE_ENV})
+    if not changed_events and not added_env:
+        print("already installed - every hook and env flag is current, "
+              "no change made")
+        return 0
+    settings["env"].update({k: "1" for k in added_env})
+    summary = (f"{added} hook(s) added and {updated} refreshed in "
+               f"{', '.join(changed_events) or 'no event'}, "
+               f"{len(added_env)} env flag(s) set"
+               + (f" ({', '.join(added_env)})" if added_env else ""))
 
     if dry_run:
-        print(f"would add {added_hooks} hooks and set {len(added_env)} "
-              f"env flags in {SETTINGS}")
+        print(f"would change {SETTINGS}: {summary}")
         return 0
 
     _save(settings)
-    print(f"installed: {added_hooks} hooks across "
-          f"{', '.join(BLOCKS)}, {len(added_env)} env flags set in "
-          f"{SETTINGS}.")
+    print(f"installed in {SETTINGS}: {summary}.")
     print("Restart Claude Code (or start a new session) for the new hooks "
           "and env flags to take effect.")
     if not os.environ.get("TYPESAFE_API_KEY"):

@@ -185,7 +185,7 @@ def run_one(setup):
             pass
         payload = json.dumps({"tool_name": "Bash",
                               "tool_input": {"command": command},
-                              "session_id": "eval-gate4", "cwd": repo})
+                              "session_id": f"eval-gate4-{evalharness.RUN_ID}", "cwd": repo})
         env = dict(os.environ, GATE4_ENABLED="1", GATE4_LOG=GATE4_EVAL_LOG,
                    JEV_FINDINGS_DIR=os.path.join(
                        tempfile.gettempdir(), "gate4-eval-findings"))

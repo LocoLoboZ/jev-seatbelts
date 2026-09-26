@@ -555,20 +555,145 @@ def call_jev(state, questions, key, model=MODEL):
             last_err = e
             if e.code not in RETRY_STATUS:
                 raise  # 401 and 422 are our bug; retrying cannot help
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
+        except urllib.error.URLError as e:
+            # urllib wraps only failures in connect/send as URLError. A
+            # timeout or reset while awaiting the response surfaces raw
+            # (TimeoutError/OSError) and is NOT retried: the request was
+            # already sent, so a retry can bill twice and charge the
+            # session cap twice for one judgement. Idea from
+            # jkudish/jev-mcp (src/provider.ts, MIT).
             last_err = e
         if attempt < len(RETRY_SLEEPS):
             time.sleep(RETRY_SLEEPS[attempt])
     raise last_err
 
 
+SHELL_TOOLS = ("Bash", "PowerShell")
+
+
+def shell_command(hook, powershell_hint):
+    """The command a shell-gate should read from this hook payload, or
+    None when the call is not its concern.
+
+    Gates matched on the Bash tool only, so on a machine where Claude
+    Code's primary shell is the PowerShell tool every commit, install and
+    destructive command skipped them entirely. The gates read commands
+    with bashparse, which shares PowerShell's words, `;`, `&&` and `|` but
+    not its quoting, so many ordinary PowerShell commands will not parse,
+    and a gate answers an unparseable command with ASK. Sending every
+    PowerShell command through would ask on nearly all of them. So a
+    PowerShell command reaches the gate only when its raw text matches
+    the gate's own topic (`powershell_hint`), and from there it gets the
+    same treatment as Bash, including ASK when it cannot be read."""
+    if not isinstance(hook, dict) or hook.get("tool_name") not in SHELL_TOOLS:
+        return None
+    ti = hook.get("tool_input")
+    cmd = ti.get("command") if isinstance(ti, dict) else None
+    if cmd is None:
+        return None
+    if hook.get("tool_name") == "PowerShell" and not (
+            isinstance(cmd, str) and powershell_hint.search(cmd)):
+        return None
+    return cmd
+
+
+_WIN_EXT = (".exe", ".cmd", ".bat", ".ps1")
+
+
+def bare_command(name):
+    """`git`, whether written git, GIT, /usr/bin/git or git.exe. The
+    commit and package gates compared the command word exactly, so on
+    Windows `git.exe commit` or `npm.cmd install x` was not recognised."""
+    if not isinstance(name, str):
+        return name
+    base = re.split(r"[\\/]", name)[-1].lower()
+    for ext in _WIN_EXT:
+        if base.endswith(ext):
+            return base[:-len(ext)]
+    return base
+
+
+# git's global options that take a separate value. Without skipping the
+# value, `git -C repo commit` read "repo" as the subcommand and the commit
+# gates saw no commit at all.
+_GIT_VALUE_OPTS = ("-C", "-c", "--git-dir", "--work-tree", "--namespace",
+                   "--exec-path", "--super-prefix", "--config-env",
+                   "--attr-source")
+
+
+def git_subcommand(texts):
+    """The git subcommand in an argument list, past global options."""
+    i = 0
+    while i < len(texts):
+        t = texts[i]
+        if t in _GIT_VALUE_OPTS:
+            i += 2
+        elif t.startswith("-"):
+            i += 1
+        else:
+            return t
+    return None
+
+
+# `git` then `commit` as a word of its own, in one line. Shared by the
+# commit gates (4 and 6). `commit-graph` and `commit-tree` are excluded.
+GIT_COMMIT_HINT = re.compile(
+    r"\bgit(?:\.exe)?\b(?:[^\r\n]|`\r?\n)*?(?<![\w-])commit(?![\w-])",
+    re.IGNORECASE)
+
+
+def noul_p(answers, key):
+    """One Noul probability from an answer map, or None when it is not a
+    usable probability. Every gate reads its answers through this.
+
+    json.load accepts the NaN and Infinity literals, and NaN compares False
+    against every threshold, so a gate testing `p >= deny_at` would ALLOW
+    on an answer it could not read. Out-of-range values, bools (an int
+    subclass) and non-dict entries are rejected the same way: None is the
+    one value every gate already treats as "no judgement". Strict answer
+    validation modelled on jkudish/jev-mcp (src/index.ts, MIT), re-derived
+    here, not copied."""
+    entry = answers.get(key) if isinstance(answers, dict) else None
+    p = entry.get("noul") if isinstance(entry, dict) else None
+    if isinstance(p, bool) or not isinstance(p, (int, float)):
+        return None
+    p = float(p)
+    return p if 0.0 <= p <= 1.0 else None  # NaN fails both comparisons
+
+
+def choice_p(answers, key, options):
+    """(chosen option, its probability) from a Choice answer, or
+    (None, None) when the answer is not trustworthy.
+
+    Trusted only if the probabilities cover exactly the expected options,
+    each is a real number in [0, 1], they sum to 1 within 0.02, and the
+    chosen option is the most probable one. Anything else is "no
+    judgement", never a guess. Checks modelled on jkudish/jev-mcp
+    (src/index.ts, MIT), re-derived here."""
+    entry = answers.get(key) if isinstance(answers, dict) else None
+    if not isinstance(entry, dict):
+        return None, None
+    probs, choice = entry.get("probabilities"), entry.get("choice")
+    if not isinstance(probs, dict) or set(probs) != set(options):
+        return None, None
+    vals = {}
+    for k, v in probs.items():
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return None, None
+        if not 0.0 <= float(v) <= 1.0:  # NaN fails too
+            return None, None
+        vals[k] = float(v)
+    if abs(sum(vals.values()) - 1.0) > 0.02 or choice not in vals:
+        return None, None
+    if vals[choice] < max(vals.values()):
+        return None, None
+    return choice, vals[choice]
+
+
 def probs_from(answers, rules, prefix="r"):
     """{rule: probability or None} from a Noul answer map keyed r0, r1, ..."""
-    out = {}
-    for i, rule in enumerate(rules):
-        p = (answers.get(f"{prefix}{i}") or {}).get("noul")
-        out[rule] = float(p) if isinstance(p, (int, float)) else None
-    return out
+    return {rule: noul_p(answers, f"{prefix}{i}")
+            for i, rule in enumerate(rules)}
 
 
 def noul_questions(rules, preamble, true_means, false_means, prefix="r"):
@@ -1393,6 +1518,66 @@ def selfcheck():
     got = probs_from({"r0": {"noul": 0.9}, "r1": {}}, ["a", "b"])
     assert got == {"a": 0.9, "b": None}, got
 
+    # An unreadable probability must read as "no judgement", never as a
+    # number a threshold test could silently pass. json.load really does
+    # produce NaN/Infinity from the bare literals, so parse them for real.
+    wild = json.loads('{"n": {"noul": NaN}, "i": {"noul": Infinity}, '
+                      '"hi": {"noul": 1.7}, "lo": {"noul": -0.1}, '
+                      '"b": {"noul": true}, "s": {"noul": "0.9"}, '
+                      '"x": null, "ok0": {"noul": 0}, "ok1": {"noul": 1}}')
+    for k in ("n", "i", "hi", "lo", "b", "s", "x", "missing"):
+        assert noul_p(wild, k) is None, (k, noul_p(wild, k))
+    assert noul_p(wild, "ok0") == 0.0 and noul_p(wild, "ok1") == 1.0
+    assert noul_p(None, "n") is None and noul_p([1], "n") is None
+
+    # Shell tools: Bash always reaches a gate, PowerShell only on its
+    # topic, and nothing else ever does.
+    def hk(tool, cmd):
+        return {"tool_name": tool, "tool_input": {"command": cmd}}
+    assert shell_command(hk("Bash", "ls"), GIT_COMMIT_HINT) == "ls"
+    assert shell_command(hk("PowerShell", "Get-ChildItem"),
+                         GIT_COMMIT_HINT) is None
+    for c in ("git commit -m x", "git add -A; git commit -F msg.txt",
+              "& git.exe -C repo commit -q", "GIT COMMIT -m x",
+              "git `\n  commit -m x", "git -C repo `\r\n commit"):
+        assert shell_command(hk("PowerShell", c), GIT_COMMIT_HINT) == c, c
+    for c in ("git commit-graph write", "git log --grep commit-tree",
+              "git status\ncommit"):
+        assert shell_command(hk("PowerShell", c), GIT_COMMIT_HINT) is None, c
+    assert shell_command(hk("Read", "git commit"), GIT_COMMIT_HINT) is None
+    assert shell_command({"tool_name": "PowerShell", "tool_input": {}},
+                         GIT_COMMIT_HINT) is None
+    assert shell_command(hk("PowerShell", ["git commit"]),
+                         GIT_COMMIT_HINT) is None
+    assert shell_command(None, GIT_COMMIT_HINT) is None
+
+    for n in ("git", "GIT", "/usr/bin/git", "git.exe", r"C:\Git\bin\git.exe"):
+        assert bare_command(n) == "git", n
+    assert bare_command("npm.cmd") == "npm" and bare_command(None) is None
+    assert git_subcommand(["-C", "repo", "commit", "-m", "x"]) == "commit"
+    assert git_subcommand(["-c", "a=b", "--no-pager", "commit"]) == "commit"
+    assert git_subcommand(["--git-dir=x", "commit"]) == "commit"
+    assert git_subcommand(["--attr-source", "main", "commit"]) == "commit"
+    assert git_subcommand(["-C", "repo"]) is None and git_subcommand([]) is None
+
+    # A Choice answer is trusted only when it is internally consistent.
+    opts = ("a", "b", "c")
+
+    def ch(choice, probs):
+        return choice_p({"k": {"choice": choice, "probabilities": probs}},
+                        "k", opts)
+    assert ch("a", {"a": 0.7, "b": 0.2, "c": 0.1}) == ("a", 0.7)
+    for bad in (ch("b", {"a": 0.7, "b": 0.2, "c": 0.1}),     # not the top
+                ch("a", {"a": 0.7, "b": 0.2}),               # missing key
+                ch("a", {"a": 0.7, "b": 0.2, "c": 0.1, "d": 0}),  # extra
+                ch("a", {"a": 0.5, "b": 0.2, "c": 0.1}),     # sums to 0.8
+                ch("a", {"a": float("nan"), "b": 0.2, "c": 0.1}),
+                ch("a", {"a": 1.2, "b": -0.1, "c": -0.1}),
+                ch("a", {"a": True, "b": 0.0, "c": 0.0}),
+                ch("z", {"a": 0.7, "b": 0.2, "c": 0.1}),
+                choice_p(None, "k", opts), choice_p({"k": "x"}, "k", opts)):
+        assert bad == (None, None), bad
+
     # An internal budget must expire, and must not be confused with the
     # harness timeout.
     b = Budget(0)
@@ -1465,6 +1650,23 @@ def selfcheck():
     assert 429 in RETRY_STATUS and 529 in RETRY_STATUS
     # Worst-case call time must fit inside a 30 s hook budget.
     assert TIMEOUT * (len(RETRY_SLEEPS) + 1) + sum(RETRY_SLEEPS) < 30
+
+    # A timeout after the request was sent must not be re-sent (a retry
+    # can bill twice). A connect-phase failure still retries.
+    import unittest.mock
+    for raised, want in ((TimeoutError("read timed out"), 1),
+                         (ConnectionResetError("reset"), 1),
+                         (urllib.error.URLError("refused"),
+                          len(RETRY_SLEEPS) + 1)):
+        with unittest.mock.patch("urllib.request.urlopen",
+                                 side_effect=raised) as uo, \
+                unittest.mock.patch("time.sleep"):
+            try:
+                call_jev({}, {}, "k")
+                raise AssertionError("call_jev must raise")
+            except type(raised):
+                pass
+            assert uo.call_count == want, (type(raised), uo.call_count)
 
     # --- P6: the pipeline-wide call budget --------------------------------
     calls_root = tempfile.mkdtemp(prefix="jev-session-calls-")

@@ -1,5 +1,5 @@
 {
-  "description": "Jev gates. Gate 1 (plan gate) inspects a plan before ExitPlanMode runs - deterministic work-class triage first (a one-line fix passes with no model call), then, only for the feature class, ten deterministic checks and exactly one Jev call carrying five judgement fields, returning go/needs-clarification/block. Gate 2 (package check) inspects a Bash command that installs an npm or PyPI package - a registry lookup confirms the name exists before Jev judges typosquat resemblance and abandonment, with a package that does not exist denied outright and no model call needed. Gate 3 (command safety) inspects a shell command before it runs and answers deny, ask, or nothing, with no model call. Gate 4 (commit screening, phase 1) inspects a git commit's staged diff for a hardcoded secret before the commit runs, also with no model call. Gate 6 (code quality) measures the same staged diff against seven fixed rules (five deterministic, one Jev, one hybrid) and records what it finds to the shared finding store - it never denies or asks, only flags a strong finding via additionalContext, because a measurement gate has no standing to block a local, reversible commit. Gate 7 (completion check) asks Jev whether a stop is premature and sends the agent back to work if so. Gate 7 is registered on Stop and on SubagentStop, because a Stop fired inside a subagent is converted to SubagentStop at runtime and would otherwise never reach the gate. The pipeline drift check (P8) runs once per session on SessionStart, asking Jev four fixed known-answer probes to check its own judgment still looks right - it decides nothing and blocks nothing, it only surfaces a warning via additionalContext if Jev's answers on obvious cases look wrong. All gates and the drift check are inert until their own enable variable is set: GATE1_ENABLED, GATE2_ENABLED, GATE3_ENABLED, GATE4_ENABLED, GATE6_ENABLED, GATE7_ENABLED and DRIFTGUARD_ENABLED.",
+  "description": "Jev gates. Gate 1 (plan gate) inspects a plan before ExitPlanMode runs - deterministic work-class triage first (a one-line fix passes with no model call), then, only for the feature class, ten deterministic checks and exactly one Jev call carrying five judgement fields, returning go/needs-clarification/block. Gate 2 (package check) inspects a Bash command that installs an npm or PyPI package - a registry lookup confirms the name exists before Jev judges typosquat resemblance and abandonment, with a package that does not exist denied outright and no model call needed. Gate 3 (command safety) inspects a shell command or edit before it runs with a deterministic parser, and asks Jev only about a command the parser cannot resolve (failing closed if Jev cannot answer). Gate 5's stall check runs after each Bash or edit tool call and, with no model call, warns the agent when the same test failure has come back three times with edits in between. Gate 4 (commit screening, phase 1) inspects a git commit's staged diff for a hardcoded secret before the commit runs, also with no model call. Gate 6 (code quality) measures the same staged diff against seven fixed rules (five deterministic, one Jev, one hybrid) and records what it finds to the shared finding store - it never denies or asks, only flags a strong finding via additionalContext, because a measurement gate has no standing to block a local, reversible commit. Gate 7 (completion check) asks Jev whether a stop is premature and sends the agent back to work if so. Gate 7 is registered on Stop and on SubagentStop, because a Stop fired inside a subagent is converted to SubagentStop at runtime and would otherwise never reach the gate. The pipeline drift check (P8) runs once per session on SessionStart, asking Jev four fixed known-answer probes to check its own judgment still looks right - it decides nothing and blocks nothing, it only surfaces a warning via additionalContext if Jev's answers on obvious cases look wrong. Gate 7's self-tune also starts on SessionStart, at most once a day, in the background: it labels new Gate 7 decisions from the human's next reply and moves a threshold only inside fixed guardrails. All gates and the drift check are inert until their own enable variable is set: GATE1_ENABLED, GATE2_ENABLED, GATE3_ENABLED, GATE4_ENABLED, GATE5_STALL_ENABLED, GATE6_ENABLED, GATE7_ENABLED, GATE7_SELFTUNE_ENABLED and DRIFTGUARD_ENABLED.",
   "hooks": {
     "PreToolUse": [
       {
@@ -14,7 +14,7 @@
         ]
       },
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
@@ -36,7 +36,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
@@ -47,13 +47,25 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/code-quality/scripts/code_quality.py\"",
             "timeout": 30,
             "statusMessage": "Gate 6 is measuring the commit's code quality"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/debug-triage/scripts/stall_check.py\"",
+            "timeout": 10
           }
         ]
       }
@@ -90,6 +102,15 @@
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/lib/driftcheck_hook.py\"",
             "timeout": 30,
             "statusMessage": "Checking Jev's own judgment still looks right"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/gate7_selftune.py\" --if-due",
+            "timeout": 10
           }
         ]
       }

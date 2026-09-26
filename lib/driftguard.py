@@ -131,9 +131,7 @@ def check(key=None, budget=None, probes=PROBES,
     answers = answers if isinstance(answers, dict) else {}
     detail = []
     for name, expect, _text, _ask in probes:
-        entry = answers.get(name)
-        p = entry.get("noul") if isinstance(entry, dict) else None
-        p = float(p) if isinstance(p, (int, float)) else None
+        p = jevgate.noul_p(answers, name)
         ok = p is not None and ((p >= per_probe_threshold) == expect)
         detail.append((name, expect, p, ok))
     if not detail:

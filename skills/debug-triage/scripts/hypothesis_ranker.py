@@ -175,8 +175,7 @@ def rank(failure, hyps, budget=None, session_id=None):
     answers = res.get("answers") or {}
     scored = []
     for h in hyps:
-        p = (answers.get(h["id"]) or {}).get("noul")
-        p = float(p) if isinstance(p, (int, float)) else None
+        p = jevgate.noul_p(answers, h["id"])
         scored.append((h, p))
     if all(p is None for _h, p in scored):
         return _print_unranked(hyps, "jev returned no usable scores")

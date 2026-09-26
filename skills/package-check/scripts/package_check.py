@@ -128,6 +128,18 @@ PIP_REGISTRY_TOOLS = {
     "poetry": {"add"},
 }
 
+# A PowerShell command reaches this gate only when it names a known
+# installer and an install verb (see jevgate.shell_command). Built from the
+# tables above so the two can never drift apart.
+_MANAGERS = sorted(set(NPM_REGISTRY_TOOLS) | set(PIP_REGISTRY_TOOLS)
+                   | {"python", "python3", "py"})
+_VERBS = sorted(set().union(*NPM_REGISTRY_TOOLS.values(),
+                            *PIP_REGISTRY_TOOLS.values()))
+INSTALL_HINT = re.compile(
+    r"\b(?:" + "|".join(map(re.escape, _MANAGERS)) + r")"
+    r"(?:\.exe|\.cmd|\.bat|\.ps1)?\b(?:[^\r\n]|`\r?\n)*?\b(?:"
+    + "|".join(map(re.escape, _VERBS)) + r")\b", re.IGNORECASE)
+
 # pip flags that take a separate value token - without this list, `pip
 # install -r requirements.txt` would read "requirements.txt" as a package
 # name. Same reasoning as Gate 3's own value-taking-flag list for
@@ -192,6 +204,7 @@ def extract_install_specs(segments):
         name, args = seg.command()
         if name is None:
             continue
+        name = jevgate.bare_command(name)
         ecosystem = None
         rest = args
         if name in NPM_REGISTRY_TOOLS or name in PIP_REGISTRY_TOOLS:
@@ -358,14 +371,9 @@ def jev_judge(ecosystem, name, last_publish, budget=None, session_id=None):
         jevgate.mark_jev_unreachable(session_id, GATE, str(exc))
         jevgate.hook_error(GATE, f"jev call failed: {exc}")
         return None, None
-    answers = res.get("answers") or {}
-    typosquat_p = (answers.get("typosquat") or {}).get("noul")
-    abandon_p = (answers.get("abandoned") or {}).get("noul")
-    typosquat_p = (float(typosquat_p)
-                  if isinstance(typosquat_p, (int, float)) else None)
-    abandon_p = (float(abandon_p)
-                if isinstance(abandon_p, (int, float)) else None)
-    return typosquat_p, abandon_p
+    answers = res.get("answers")
+    return (jevgate.noul_p(answers, "typosquat"),
+            jevgate.noul_p(answers, "abandoned"))
 
 
 def judge_package(ecosystem, name, budget=None, session_id=None):
@@ -551,10 +559,7 @@ def main():
     global _HOOK
     hook = json.load(sys.stdin)
     _HOOK = hook if isinstance(hook, dict) else {}
-    if _HOOK.get("tool_name") != "Bash":
-        return 0
-    tool_input = _HOOK.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    command = jevgate.shell_command(_HOOK, INSTALL_HINT)
     if command is None:
         return 0
     return finish(decide(command, budget, _HOOK.get("session_id")),
@@ -571,6 +576,16 @@ def selfcheck():
         return extract_install_specs(bashparse.parse(cmd))
 
     assert specs("ls -la") == []
+    assert specs("npm.cmd install left-pad") == [("npm", "left-pad")]
+    assert specs("pip.exe install requests") == [("pypi", "requests")]
+    # The PowerShell topic filter: installs pass, other commands do not.
+    for c in ("npm install left-pad", "npm.cmd i left-pad",
+              "python -m pip install numpy", "Set-Location x; pip install y",
+              "npm `\n  install left-pad"):
+        assert INSTALL_HINT.search(c), c
+    for c in ("npm run build", "pip list", "Get-ChildItem",
+              "Install-Module Foo", "npm list\ninstall"):
+        assert not INSTALL_HINT.search(c), c
     assert specs("npm install left-pad") == [("npm", "left-pad")]
     assert specs("npm i react react-dom") == [
         ("npm", "react"), ("npm", "react-dom")]

@@ -21,23 +21,27 @@ description: >
 Stopping a destructive shell command before it runs, without becoming the
 kind of gate people delete.
 
-It runs as a Claude Code `PreToolUse` hook. It makes **no model call**, needs
-no API key and no network, and answers in microseconds.
+It runs as a Claude Code `PreToolUse` hook on the `Bash` and `PowerShell`
+tools, and on the file tools for self-protection. A deterministic floor
+decides first, with no model call. Only what the floor cannot settle goes
+to Jev.
 
-## The three outcomes
+## The outcomes
 
 The gate parses the command, then classifies it:
 
 | Outcome | When | What the harness does |
 | --- | --- | --- |
-| **deny** | Resolved, and on the denylist | The command does not run, and the agent is given a remediation intent code |
-| **ask** | Unresolvable | The human is asked |
+| **deny** | Resolved, and on the fixed floor (catastrophic, self-protection, or a family's hard stop) | The command does not run, and the agent is given a remediation intent code. Jev is never asked |
+| **Jev judges** | A family flagged it as worth a second opinion, or it is unresolvable | Jev's answer is acted on at once: deny at or above the category's threshold, allow below it. No human click |
+| **deny** | Jev could not be asked (no key, call failed, budget spent) | Fails closed. `GATE3_JEV_FAIL_OPEN=1` allows instead, and `python lib/bypass.py --grant` gives a one-time ticket for this tier only |
+| **ask** | The text cannot be parsed, a cap is exceeded, or the gate itself crashed | The human is asked |
 | **allow** | Resolved, and no family matched | The gate stays silent and the normal permission flow continues |
 
 "Resolved" means every verb was read from a **literal** word. That is the
 central idea, lifted from `cc-safety-net`: a command name is returned only
 when its provenance is literal. `$CMD -rf /` does not name `rm`, so the gate
-does not pretend to know what it is. It asks.
+does not pretend to know what it is. Jev judges it.
 
 The allow answer is deliberately silent rather than an explicit `allow`
 decision. An explicit allow would short-circuit the user's own permission
@@ -46,13 +50,11 @@ rules and every other PreToolUse hook, so this gate only ever says "deny",
 
 ## Unresolvable, in full
 
-Any of these, and the gate asks:
+Any of these, and Jev judges the command:
 
-- the text cannot be parsed, including unbalanced quoting and an
-  unterminated heredoc
 - **any word anywhere in the command** carries an expansion or substitution
   marker (`$`, backtick, `${`), whatever the verb is. `git commit -m "$MSG"`
-  asks. This is the noisiest rule in the gate and it is deliberate: a word
+  goes to Jev. This is the noisiest rule in the gate and it is deliberate: a word
   built at run time is not a word this gate has read. The first build ran
   this check only when the verb itself could not be named, which independent
   review reproduced as a bypass
@@ -64,8 +66,17 @@ Any of these, and the gate asks:
   `find -delete`), because the real verb can arrive from stdin
 - a decoder (`base64 -d`, `xxd -r`, `openssl enc -d`, `uudecode`) appears
   alongside a shell or interpreter
+- in PowerShell, a .NET method call, `Invoke-Expression`, `Start-Process`,
+  `Invoke-Command`, `cmd /c`, `wsl`, or a cmdlet parameter that cannot be
+  bound
+- more than 4 wrapper layers
+
+And these, which the gate cannot read at all, ask the human:
+
+- the text cannot be parsed, including unbalanced quoting and an
+  unterminated heredoc
 - a cap is exceeded: 8,000 characters, 400 words, 60 segments, 6 levels of
-  nesting, 4 wrapper layers
+  nesting
 
 Wrappers are seen through rather than trusted: `sudo -u root`, `timeout 5`,
 `env /bin/rm`, `nice -n 10`, and the `command`, `exec` and `builtin`
@@ -73,6 +84,12 @@ built-ins all resolve to the real verb, with their option values consumed.
 Shell control words (`if`, `then`, `do`) are not commands. Heredoc bodies
 are stdin, not shell. Every one of those is here because independent review
 reproduced it as a bypass or a false block first.
+
+PowerShell is read by `lib/psparse.py`, which returns the same segments.
+The cmdlets that delete or write (`Remove-Item`, `Set-Content`,
+`Copy-Item`, `Out-File` and the rest, with their aliases) are mapped onto
+the same families, so `Remove-Item -Recurse -Force C:\` meets the same
+check as `rm -rf /`. See RR-18 for what still escapes.
 
 Caps fail **closed**. Claude Code's own deny evaluator reportedly stops
 evaluating past 50 subcommands and falls back to a prompt, and reportedly
@@ -127,7 +144,7 @@ rather than waved through.
 Writes to the files that decide whether hooks run at all are denied:
 `~/.claude/settings*.json`, `.claude/hooks/`, `.git/hooks/`, `~/.jev-gates/`
 and the common shell rc files. This covers output redirection targets, the
-written operands of file-writing verbs, and the `file_path` of `Write`,
+written operands of file-writing verbs and cmdlets, and the `file_path` of `Write`,
 `Edit`, `MultiEdit` and `NotebookEdit`.
 
 Only actual writes count. `cat < ~/.bashrc`, `cp ~/.bashrc /tmp/backup` and
@@ -166,7 +183,14 @@ Offline checks, no key and no network:
 
 ```console
 python lib/bashparse.py
+python lib/psparse.py
 python skills/command-safety/scripts/command_safety.py --selfcheck
+```
+
+The eval runs the real hook and makes live Jev calls for its `judged`
+cases, so it needs `TYPESAFE_API_KEY`:
+
+```console
 python skills/command-safety/scripts/eval_gate3.py
 ```
 
@@ -175,6 +199,8 @@ python skills/command-safety/scripts/eval_gate3.py
 | Variable | Meaning |
 | --- | --- |
 | `GATE3_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. Anything else, including a typo, leaves it off. |
+| `GATE3_JEV_FAIL_OPEN` | `1` allows a command Jev could not judge, instead of denying it. Off by default. Never reaches the fixed floor. |
+| `GATE3_JEV_DENY` | A number from 0 to 1 that replaces every category's Jev deny threshold at once. Unset, each category uses its own calibrated value (default 0.50). |
 | `GATE3_EXTRA_ASK` | Newline-separated regular expressions. Each one that matches **adds** an ask. Config can never remove a family or downgrade a verdict. An invalid pattern is skipped, not fatal, so one typo cannot disable the gate. |
 | `GATE3_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate3.jsonl`. |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. |
@@ -185,28 +211,23 @@ is on, no configuration variable reaches the catastrophic set or the
 self-protection set. There is deliberately no per-family off switch: one
 variable that turns off the boundary is not a boundary.
 
-## Status: deterministic v1, no model call
+## Status: deterministic floor plus a Jev-judged tier
 
-Gate 3 v1 ships the deterministic half only, and it carries almost all the
-weight: `garrytan/gstack` gates the same commands in production with zero
-model calls.
+The deterministic floor carries almost all the weight: `garrytan/gstack`
+gates the same commands in production with zero model calls. Jev judges
+only what the floor flags or cannot read, against per-category thresholds
+in `JEV_THRESHOLDS` in `scripts/command_safety.py`. See
+`reference/DESIGN-BASIS.md`, "Gate 3 reframed", for why.
 
-**Deferred, not dropped:** the tier-4 semantic question. Our own probe
-scored a recursive delete of a real documents directory, with the stated
-intent "clean up build artefacts", at 0.95 destructive, block at 0.99 with
-confidence 0.98, and intent match 0.03 of 2. No regex reaches that. It is
-RR-13 in the register, and it is the one judgement in this gate worth paying
-for. It is not shipped because the deterministic half had to be correct
-first, and because the standing project rule forbids shipping a gate with an
-uncalibrated borrowed threshold.
-
-The eval is 69 cases, offline and deterministic, with a stored baseline at
-`evals/baseline/gate3.json`. It passes 69 of 69. Twenty of those cases exist
-because an independent Codex review found them: one critical fail-open on
-import, seven bypasses of the classification, and four false blocks. The
-first eval passed 49 of 49 while every one of those was live, which is the
-most useful thing this gate has learned so far. An eval written by the
-author of the gate measures intent, not resistance.
+The eval is 128 cases, run through the real hook, with a stored baseline
+at `evals/baseline/gate3.json`. It passes 128 of 128. The cases marked
+`judged` make a live Jev call and need a key. The rest do not. Thirteen
+cases cover the PowerShell tool. Twenty exist because an independent Codex
+review found them: one critical fail-open on import, seven bypasses of the
+classification, and four false blocks. The first eval passed 49 of 49
+while every one of those was live, which is the most useful thing this
+gate has learned so far. An eval written by the author of the gate
+measures intent, not resistance.
 
 Read `references/RESIDUAL-RISKS.md` before believing anything about
 coverage.
@@ -217,3 +238,4 @@ coverage.
 - `references/PROVENANCE.md` - every lifted idea, its source, and its licence
 - `references/EVAL.md` - the eval cases and what the run showed
 - `../../lib/bashparse.py` - the parser, its provenance model, and its caps
+- `../../lib/psparse.py` - the PowerShell reader, same contract (RR-18)

@@ -153,6 +153,17 @@ SECRET_PATTERNS = (
      "A Google API key."),
     ("secret-npm-token", re.compile(r"\bnpm_[0-9A-Za-z]{36}\b"),
      "An npm publish token."),
+    # The next three are the provider-defined shapes this product's own
+    # users are most likely to hold: its own TypeSafe key first. Shapes
+    # borrowed from ChetasLua/jevmeter (scripts/check_secrets.py, MIT).
+    ("secret-typesafe-key",
+     re.compile(r"\bapikey_[0-9a-f]{20,}_[0-9a-f]{20,}\b"),
+     "A TypeSafe API key."),
+    ("secret-anthropic-key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{80,}"),
+     "An Anthropic API key."),
+    ("secret-openai-project-key",
+     re.compile(r"\bsk-proj-[A-Za-z0-9_-]{40,}"),
+     "An OpenAI project API key."),
     ("secret-private-key-block",
      re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
      "A private key block."),
@@ -239,10 +250,10 @@ def is_commit(command):
     saw_add = False
     for seg in segments:
         name, args = seg.command()
-        if name != "git":
+        if jevgate.bare_command(name) != "git":
             continue
         texts = [w.text for w in args]
-        sub = next((t for t in texts if not t.startswith("-")), None)
+        sub = jevgate.git_subcommand(texts)
         if sub == "add":
             saw_add = True
             continue
@@ -490,10 +501,8 @@ def jev_judge(diff_text, hits, stat, budget=None, prior_gate3=None,
         jevgate.hook_error(GATE, f"jev call failed: {exc}")
         return None, None
     answers = res.get("answers") or {}
-    secret_p = (answers.get("secret") or {}).get("noul")
-    risk_p = (answers.get("risk") or {}).get("noul")
-    secret_p = float(secret_p) if isinstance(secret_p, (int, float)) else None
-    risk_p = float(risk_p) if isinstance(risk_p, (int, float)) else None
+    secret_p = jevgate.noul_p(answers, "secret")
+    risk_p = jevgate.noul_p(answers, "risk")
     return secret_p, risk_p
 
 
@@ -682,10 +691,7 @@ def main():
     global _HOOK
     hook = json.load(sys.stdin)
     _HOOK = hook if isinstance(hook, dict) else {}
-    if _HOOK.get("tool_name") != "Bash":
-        return 0
-    tool_input = _HOOK.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    command = jevgate.shell_command(_HOOK, jevgate.GIT_COMMIT_HINT)
     if command is None:
         return 0
     budget = jevgate.Budget(HOOK_BUDGET_MS)
@@ -716,6 +722,11 @@ def selfcheck():
     assert is_commit("git log") == (False, False)
     assert is_commit("echo git commit -m x") == (False, False)
     assert is_commit("git commit-graph write") == (False, False)
+    # Windows and global-option spellings of the same commit.
+    assert is_commit("git.exe commit -m x") == (True, False)
+    assert is_commit("git -C repo commit -m x") == (True, False)
+    assert is_commit("git -C repo add . ; git -C repo commit -m x") == (
+        True, True)
     got, _ = is_commit("'unterminated")
     assert got is None, got  # unparseable, not "not a commit"
 
@@ -729,11 +740,20 @@ def selfcheck():
             "secret-stripe-live-key": "sk_live_" + "a" * 24,
             "secret-google-api-key": "AIza" + "a" * 35,
             "secret-npm-token": "npm_" + "a" * 36,
+            "secret-typesafe-key": "apikey_" + "0f" * 12 + "_" + "a1" * 12,
+            "secret-anthropic-key": "sk-ant-" + "api03-" + "A" * 90,
+            "secret-openai-project-key": "sk-proj-" + "b" * 48,
             "secret-private-key-block": "-----BEGIN RSA PRIVATE KEY-----",
         }[rule_id]
         v = scan(_diff([f"KEY = {example!r}"]))
         assert v is not None and v.rule == rule_id, (rule_id, v)
         assert v.path == "a.py" and v.line == 1, (rule_id, v)
+
+    # Near misses stay silent: too short, or not hex where hex is required.
+    for near in ("apikey_" + "0f" * 5 + "_" + "a1" * 12,
+                 "apikey_" + "zz" * 12 + "_" + "a1" * 12,
+                 "sk-ant-" + "A" * 20, "sk-proj-" + "b" * 10):
+        assert scan(_diff([f"KEY = {near!r}"])) is None, near
 
     # A secret on a REMOVED or context line must never fire - only an
     # added line is a new leak.

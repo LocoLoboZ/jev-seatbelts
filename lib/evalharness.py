@@ -30,6 +30,12 @@ BASELINES = os.path.join(ROOT, "evals", "baseline")
 # normal; this is set above the noise we have observed, not at zero.
 DRIFT = 0.10
 
+# One id per eval run, suffixed onto every eval session_id. A fixed id
+# ("eval") let jevgate's per-session call cap accumulate across every run
+# ever made, so once 200 lifetime eval calls were spent every later run
+# failed closed and reported budget exhaustion as gate regressions.
+RUN_ID = f"{time.strftime('%Y%m%d%H%M%S')}-{os.getpid()}"
+
 
 def transcript(human, tool_calls, final):
     """One human turn as Claude Code transcript rows.
@@ -60,7 +66,7 @@ def _run_one(hook_path, rows, cwd, log_path):
                 f.write(json.dumps(r) + "\n")
         before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
         hook = {"transcript_path": path, "stop_hook_active": False,
-                "cwd": cwd, "session_id": "eval"}
+                "cwd": cwd, "session_id": f"eval-{RUN_ID}"}
         p = subprocess.run([sys.executable, hook_path], input=json.dumps(hook),
                            capture_output=True, text=True, timeout=90)
         top = None

@@ -69,12 +69,10 @@ reads the parsed words and is scoped to a known database client. Closing
 this means reading the file, which RR-4 already rules out for the same
 reason.
 
-**RR-8. Windows-shell syntax. `open`.**
-The parser reads POSIX shell. `Remove-Item -Recurse -Force C:\` in a
-PowerShell tool call is not parsed as PowerShell, and the raw-text layer
-only carries a small number of patterns. Claude Code sends `Bash` tool calls
-here, which is why this has not been closed, and it is a real gap on a
-Windows box with a different tool wired in.
+**RR-8. Windows-shell syntax. `escalates`.**
+PowerShell tool calls are read as PowerShell since 2026-09-26. See RR-18
+for what that reader covers and what still escapes it. `cmd.exe` syntax is
+not read: `cmd /c ...` goes to Jev as a command this gate cannot read.
 
 **RR-9. Anything past a cap. `escalates`.**
 Over 8,000 characters, 400 words, 60 segments or 6 levels of nesting, the
@@ -99,12 +97,14 @@ contract, nothing is enforced. This is why the enable state is printed in
 the gate's own log and why the README says plainly that installing this
 gives no protection until it is switched on.
 
-**RR-13. No semantic judgement. `open`.**
+**RR-13. Semantic judgement only where the floor flags. `open`.**
 Our own probe scored a recursive delete of a real documents directory, with
 the stated intent "clean up build artefacts", at 0.95 destructive and 0.03
-of 2 on intent match. No regex reaches that. Gate 3 v1 makes no model call
-at all, so a command that is syntactically ordinary and semantically wrong
-is allowed. The deferred tier 4 in `../SKILL.md` is where that closes.
+of 2 on intent match. No regex reaches that. Jev now judges every command
+the floor flags or cannot read, so that delete reaches Jev as
+`delete-recursive`. A command the floor resolves as safe is never sent to
+Jev, so one that is syntactically ordinary and semantically wrong, with no
+family matching it, is still allowed.
 
 **RR-14. The allow answer is deliberately silent. `accepted`.**
 When no family matches, the gate exits 0 and prints nothing rather than
@@ -125,6 +125,38 @@ classified, which is the part that matters.
 Bodies are stripped before parsing, and a quoted delimiter makes the body
 inert. Two heredocs opened on a single line are handled sequentially rather
 than by bash's exact rules. An unterminated heredoc raises and becomes ask.
+
+**RR-18. PowerShell is read by a reader of its own. `escalates`.**
+Found 2026-09-26: this gate was registered on the Bash tool only, so
+`Remove-Item -Recurse -Force C:\` through the PowerShell tool ran with no
+check. Closed the same day. `lib/psparse.py` reads PowerShell into the same
+segments bashparse makes: the backtick escape and line continuation,
+single and double quotes and their doubling, curly quotes, here-strings,
+`#` and `<# #>` comments, the call operator, redirections, and assignments.
+`$(...)`, `@(...)`, `(...)` and `{...}` bodies are lifted out and checked,
+so a script block cannot hide a command. `ps_translate()` then binds the
+parameters of the cmdlets that delete or write (`Remove-Item`, `Copy-Item`,
+`Move-Item`, `Rename-Item`, `Set-Content`, `Add-Content`, `Clear-Content`,
+`Out-File`, `Tee-Object`, `New-Item` and their aliases) the way PowerShell
+does, by name, prefix, `-Name:value` and position, and hands them to the
+existing families. Native commands (`git`, `kubectl`, `terraform`) meet the
+same families as in Bash. Disk wipes (`Format-Volume`, `Clear-Disk`,
+`format D:`) and shadow-copy or backup deletion are denied outright.
+
+What still escapes the fixed floor and goes to Jev: a .NET method call
+(`[IO.Directory]::Delete(...)`), `Invoke-Expression`, `Start-Process`,
+`Invoke-Command`, `cmd /c`, `wsl`, a parameter that cannot be bound, and
+any word built at run time. What is not seen at all, and stays `open`:
+
+- An alias or function the user's profile redefines. The reader knows the
+  default aliases only. A function defined in the same command is seen,
+  because its body is lifted.
+- Destructive cmdlets outside the mapped set, for example
+  `Remove-ItemProperty`, `Remove-CimInstance`, `Stop-Computer` or
+  `Set-MpPreference -DisableRealtimeMonitoring`. They are allowed unread,
+  the same way an unknown Bash verb is.
+- `Move-Item` away from a protected file is not a write to it, the same gap
+  `mv` has in Bash.
 
 **RR-15. Every one of these is written from our own reading. `open`.**
 No adversary has tested this gate. The register records what was

@@ -132,6 +132,12 @@ TEST_PATTERNS = re.compile(
 # disarmed the rule that blocks a premature completion claim. A flag is a
 # flag and an invocation needs an interpreter in front of it.
 
+# Tools whose command text can be a test run. Bash alone missed every test
+# run on a Windows machine where Claude Code's primary shell is the
+# PowerShell tool: a turn that ran the whole eval suite was logged with
+# tests_run [] and blocked as a claim with no tests behind it.
+SHELL_TOOLS = ("Bash:", "PowerShell:")
+
 # A project names its checks what it likes, and this one runs
 # `python lib/jevgate.py`, which looks nothing like pytest.
 EXTRA_TEST_VAR = "GATE7_EXTRA_TEST"
@@ -163,6 +169,27 @@ def _git(cwd, *args):
         detail = (r.stderr or "").strip()[:200] or f"{label} exited {r.returncode}"
         return jevgate.reading(jevgate.READ_NA, detail=detail)
     return jevgate.reading(jevgate.READ_OK, value=r.stdout.strip())
+
+
+TUNED_DEFAULT = "~/.jev-gates/gate7-thresholds.json"
+
+
+def spec_for(env_var, kind, default):
+    """The threshold spec this decision uses. An operator's env value
+    always wins. Otherwise the per-rule values gate7_selftune.py fitted
+    and guarded, if any. Otherwise the placeholder default. A missing or
+    unreadable tuned file is the placeholder, never an error."""
+    if (os.environ.get(env_var) or "").strip():
+        return jevgate.thresholds(env_var, default)
+    path = os.path.expanduser(os.environ.get("GATE7_TUNED") or TUNED_DEFAULT)
+    try:
+        with open(path, encoding="utf-8") as f:
+            tuned = (json.load(f).get(kind) or {})
+        return default, {str(k): float(v) for k, v in tuned.items()
+                         if isinstance(v, (int, float))
+                         and not isinstance(v, bool) and 0.0 < v < 1.0}
+    except (OSError, ValueError, AttributeError, TypeError):
+        return default, {}
 
 
 def test_patterns():
@@ -199,7 +226,7 @@ def evidence(cwd, tools):
     says whether tests actually ran and what they returned."""
     pats = test_patterns()
     runs = [t for t in tools
-            if t.startswith("Bash:") and any(p.search(t) for p in pats)]
+            if t.startswith(SHELL_TOOLS) and any(p.search(t) for p in pats)]
     ev = {
         "test commands run this turn": runs,
         "any test command failed": any(t.endswith("-> error") for t in runs),
@@ -383,8 +410,8 @@ def main():
         res, answers = {"error": str(e)[:300]}, {}
 
     probs = jevgate.probs_from(answers, rules)
-    block_spec = jevgate.thresholds("GATE7_BLOCK", DEFAULT_BLOCK)
-    warn_spec = jevgate.thresholds("GATE7_WARN", DEFAULT_WARN)
+    block_spec = spec_for("GATE7_BLOCK", "block", DEFAULT_BLOCK)
+    warn_spec = spec_for("GATE7_WARN", "warn", DEFAULT_WARN)
 
     # Only an "observed" rule may block. A "stated" rule is scored over text
     # the stopping agent wrote, and the vendor documents that such text can
@@ -404,6 +431,7 @@ def main():
                    "warned": [r for r, _ in warns],
                    "classes": klass,
                    "block_default": DEFAULT_BLOCK, "warn_default": DEFAULT_WARN,
+                   "block_spec": block_spec[1], "warn_spec": warn_spec[1],
                    "n_tools": len(tools),
                    "prior_findings": len(prior["value"]),
                    "prior_findings_state": prior["state"],
@@ -432,6 +460,35 @@ def selfcheck():
     """Checks for the gate-specific logic. Shared plumbing is covered by
     `python lib/jevgate.py`, which this runs first."""
     jevgate.selfcheck()
+
+    # A PowerShell-tool test run is a test run. A non-shell tool whose
+    # argument happens to look like one is not.
+    ev_ps = evidence(None, [
+        "PowerShell: python skills/completion-check/scripts/eval_gate7.py -> ok"])
+    assert ev_ps["no test command was run this turn"] is False, ev_ps
+    ev_rd = evidence(None, ["Read: tests/eval_gate7.py pytest"])
+    assert ev_rd["no test command was run this turn"] is True, ev_rd
+
+    # Tuned thresholds: used when no env override, env wins when set, and
+    # a missing, corrupt or out-of-range file falls back to the default.
+    tuned = os.path.join(tempfile.mkdtemp(prefix="g7tuned-"), "t.json")
+    with open(tuned, "w", encoding="utf-8") as f:
+        json.dump({"block": {"rule a": 0.8, "rule b": 1.5, "rule c": True},
+                   "warn": {"rule a": 0.4}}, f)
+    with unittest.mock.patch.dict(os.environ, {"GATE7_TUNED": tuned}):
+        os.environ.pop("GATE7_BLOCK", None)
+        spec = spec_for("GATE7_BLOCK", "block", 0.75)
+        assert spec == (0.75, {"rule a": 0.8}), spec
+        assert jevgate.threshold_for("rule a", spec) == 0.8
+        assert jevgate.threshold_for("rule z", spec) == 0.75
+        with unittest.mock.patch.dict(os.environ, {"GATE7_BLOCK": "0.9"}):
+            assert spec_for("GATE7_BLOCK", "block", 0.75) == (0.9, {})
+    with open(tuned, "w", encoding="utf-8") as f:
+        f.write("{not json")
+    with unittest.mock.patch.dict(os.environ, {"GATE7_TUNED": tuned}):
+        assert spec_for("GATE7_WARN", "warn", 0.5) == (0.5, {})
+    with unittest.mock.patch.dict(os.environ, {"GATE7_TUNED": tuned + ".x"}):
+        assert spec_for("GATE7_WARN", "warn", 0.5) == (0.5, {})
 
     tools = ["Bash: pytest -q -> error"]
     ev = evidence(None, tools)

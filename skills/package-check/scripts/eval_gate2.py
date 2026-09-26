@@ -92,7 +92,7 @@ def run_one(command):
         pass
     payload = json.dumps({"tool_name": "Bash",
                           "tool_input": {"command": command},
-                          "session_id": "eval-gate2", "cwd": os.getcwd()})
+                          "session_id": f"eval-gate2-{evalharness.RUN_ID}", "cwd": os.getcwd()})
     env = dict(os.environ, GATE2_ENABLED="1", GATE2_LOG=GATE2_EVAL_LOG,
               JEV_FINDINGS_DIR=os.path.join(tempfile.gettempdir(),
                                             "gate2-eval-findings"))

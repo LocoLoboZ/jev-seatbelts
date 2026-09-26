@@ -608,8 +608,7 @@ def jev_judge(plan_text, budget=None, session_id=None):
     answers = res.get("answers") or {}
 
     def _p(k):
-        v = (answers.get(k) or {}).get("noul")
-        return float(v) if isinstance(v, (int, float)) else None
+        return jevgate.noul_p(answers, k)
 
     return {k: _p(k) for k in _QUESTIONS}
 

@@ -194,6 +194,18 @@ means "a debugging session began" to fire a `PreToolUse` or `Stop` hook
 on. It is discovered and followed as a skill, per the trigger description
 above, the same way `superpowers:systematic-debugging` already is.
 
+**One hook after all: the stall check (2026-09-26).** There is still no
+event for "a debugging session began", but there is one for its most
+common failure: edit, re-run, same failure. `scripts/stall_check.py` runs
+on `PostToolUse` for Bash and edit tools, fingerprints each failing
+test-like run (last 40 lines, digits and hex masked), and when the same
+fingerprint returns three times with an edit in between it tells the
+agent, via `additionalContext`, to stop guessing and come back here. No
+model call, never blocks, off until `GATE5_STALL_ENABLED=1`. Idea from
+`awlevin/typesafe-computer-use` (MIT), see
+`reference/PIPELINE-RESEARCH.md`. Self-check:
+`python skills/debug-triage/scripts/stall_check.py --selfcheck`.
+
 **Phases 1, 2, 4, 5, 6 are process, not code**, and stay that way - Matt
 Pocock's own discipline, followed directly, with nothing to build. Only
 phase 3's ranking needed a script, because ranking probabilistically is

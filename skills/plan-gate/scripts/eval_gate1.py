@@ -97,7 +97,7 @@ def run_one(plan):
         pass
     payload = json.dumps({"tool_name": "ExitPlanMode",
                           "tool_input": {"plan": plan},
-                          "session_id": "eval-gate1", "cwd": THIS_DIR})
+                          "session_id": f"eval-gate1-{evalharness.RUN_ID}", "cwd": THIS_DIR})
     env = dict(os.environ, GATE1_ENABLED="1", GATE1_LOG=GATE1_EVAL_LOG,
               JEV_FINDINGS_DIR=os.path.join(tempfile.gettempdir(),
                                             "gate1-eval-findings"))
