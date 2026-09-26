@@ -42,6 +42,9 @@ came out of it.
 - **The review chart is gone.** Its round counts were wrong: later rounds
   found real defects, not zero. The README no longer claims the reviews
   converged to zero.
+- **Two test charts replace it.** Drawn from the 214 eval runs saved
+  during the build: runs per gate, with any failures shown, and Gate 3's
+  test cases growing from 69 to 128.
 - **Every gate's docs now match its code.** All seven `SKILL.md` files,
   their reference files, `SECURITY.md`, `CONTRIBUTING.md`, the design
   notes, and the `hooks.json` and `plugin.json` descriptions were checked

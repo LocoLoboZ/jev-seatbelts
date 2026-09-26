@@ -49,6 +49,19 @@ review history - nothing here is a marketing number.
 
 "She'll be right" is not a test result. These are.
 
+![Every saved test run, per gate](docs/images/test-runs-per-gate.svg)
+
+Every eval run saved during the build, 2026-09-20 to 2026-09-26. A run
+with a failure means at least one case did not get the answer it should
+have. That is a test doing its job. Every gate's latest run passes all
+of its cases.
+
+![Gate 3 test cases over time](docs/images/gate3-test-growth.svg)
+
+The riskiest gate's test suite grew as each review found a new way to
+write a dangerous command. Each new trick became a test case, and every
+stored baseline passed all of its cases.
+
 ## Status
 
 All seven gates are built. Read this before installing - it's the fine
