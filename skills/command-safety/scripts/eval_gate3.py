@@ -11,9 +11,9 @@ lib/jevgate.py:api_key, which cannot be suppressed by clearing this
 subprocess's own environment - that means a live call, and a live model's
 answer is not the kind of thing a static fixture should pin to one value.
 `expected="judged"` exists for exactly that: it passes on either allow or
-deny, and only fails if the gate falls back to ask (Jev unreachable is
-allow, not ask - see the fixed-floor cases below for what still asks) or
-crashes. `expected` of a plain allow/deny/ask still means exactly that one
+deny, and also requires the jev-judged rule, so it fails if the gate
+asks, crashes, or never reached Jev. Jev unreachable is deny with a
+different rule (fail closed), so with no key a judged case fails. `expected` of a plain allow/deny/ask still means exactly that one
 value, for the fixed-floor and internal-failure cases those are
 deterministic for. Does not use `lib/evalharness.py`, which drives a Stop
 hook with a transcript and compares probabilities; there are no

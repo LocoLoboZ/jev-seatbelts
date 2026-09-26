@@ -752,4 +752,21 @@ def selfcheck():
 if __name__ == "__main__":
     if "--selfcheck" in sys.argv:
         sys.exit(selfcheck())
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001
+        # Exit 1 would mean neither allow nor block. Answer ask instead,
+        # the same as Gates 3 and 4 - bad stdin included.
+        try:
+            jevgate.hook_error(GATE, f"unhandled: {type(exc).__name__}: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+        if os.environ.get("GATE2_DEBUG"):
+            import traceback
+            traceback.print_exc()
+        try:
+            sys.exit(finish(Verdict(ASK, "internal-error",
+                                    "Gate 2 failed internally, so this "
+                                    "install is not resolved."), "", time.time()))
+        except Exception:  # noqa: BLE001
+            sys.exit(_bare_ask("failed even while reporting failure."))

@@ -1,8 +1,9 @@
 ---
 name: package-check
 description: >
-  Gate 2. Runs before ANY npm/yarn/pnpm install or pip/pip3/poetry
-  install. A registry lookup (npm registry or PyPI, deterministic, no
+  Gate 2. Runs before a named-package install: npm install/i/add, yarn
+  add, pnpm install/i/add, pip or pip3 install, python -m pip install, or
+  poetry add. A registry lookup (npm registry or PyPI, deterministic, no
   model call) confirms the package name actually exists before anything
   else happens - a name that does not exist is denied outright, the
   exact failure class a hallucinated or mistyped dependency is. A
@@ -28,18 +29,19 @@ existence is a fact lookup, not a calibrated judgment. So the registry
 lookup **is** the gate. Jev runs only after the facts are fetched, on
 the judgments a lookup genuinely cannot make.
 
-It runs as a Claude Code `PreToolUse` hook on the `Bash` tool, the same
-matcher Gates 3 and 4 use. It only ever has an opinion about a command
-that resolves to a registry install; every other Bash command passes
-through untouched.
+It runs as a Claude Code `PreToolUse` hook on the `Bash` and
+`PowerShell` tools, the same matcher Gates 4 and 6 use. A PowerShell
+command reaches it only when its text names a known installer and an
+install verb. It only ever has an opinion about a command that resolves
+to a registry install. Every other command is allowed silently.
 
 ## The three outcomes
 
 | Outcome | When | What the harness does |
 | --- | --- | --- |
 | **deny** | The registry says the name does not exist (`package-not-found`), or Jev judges it a likely typosquat (`jev-judged-typosquat`) | The install does not run |
-| **ask** | The command names an install, but the registry lookup itself failed (network/DNS down, a non-404 HTTP error) | The human is asked |
-| **allow** | Not an install, or the name exists and Jev found nothing wrong (`jev-judged-clean`/`resolved-safe`), or Jev judged it likely abandoned (`jev-judged-abandoned` - allowed, but flagged) | The gate stays silent, except the abandoned flag below |
+| **ask** | The command names an install, but the registry lookup itself failed (network/DNS down, a non-404 HTTP error). Also any command the gate cannot read: unparseable, not a string, a check that failed, or an internal error | The human is asked |
+| **allow** | Not an install, or the name exists and Jev found nothing wrong (`jev-judged-clean`), or the name exists and Jev was never asked (`resolved-safe`), or Jev judged it likely abandoned (`jev-judged-abandoned` - allowed, but flagged) | The gate stays silent, except the abandoned flag below |
 
 Allow is silent by design, same reasoning as Gates 3 and 4: an explicit
 `allow` decision would short-circuit the user's own permission rules and
@@ -54,28 +56,32 @@ same carve-out shape as Gate 4's `jev-risk-tier`.
 
 npm (via `npm`, `yarn`, or `pnpm` - all three install from the same npm
 registry, so the registry is what is checked, not the CLI) and PyPI (via
-`pip`, `pip3`, `python -m pip`, or `poetry`). cargo, go modules, and gem
+`pip install`, `pip3 install`, `python -m pip install`, or `poetry add`).
+`yarn install` and `poetry install` name no package, so they are not
+checked. cargo, go modules, and gem
 are not covered - a deliberate first slice, the same "deliberately not
 further" reasoning Gate 3's own build-order notes use for cloud CLIs.
 
 ## Distinguishing a real Jev judgment from Jev being unreachable
 
 Same discipline as Gates 3 and 4: `jev-judged-clean` means Jev was
-actually asked and found nothing; `resolved-safe` means Jev was never
+actually asked and found nothing. `resolved-safe` means Jev was never
 consulted (no key, insufficient time budget, session call budget spent,
 or a failed call) and only the registry fact stands. `eval_gate2.py`'s
-`judged` cases check the rule name, not just the outcome, so an
-unreachable Jev can never masquerade as a real judgment and still pass.
+`judged` cases check the logged rule name, not just the outcome, so an
+unreachable Jev cannot pass as a real judgment. One exception: when no
+rule was logged at all, the case falls back to the outcome alone, so a
+missing log line can still let it pass.
 
 ## What the fixed floor actually checks
 
 A registry HTTP lookup - `registry.npmjs.org/<name>` or
 `pypi.org/pypi/<name>/json` - with no local heuristic at all. A 404
-means the name does not exist; any other failure (timeout, DNS, a 5xx)
+means the name does not exist. Any other failure (timeout, DNS, a 5xx)
 is a lookup failure, not a fact, and answers **ask**, never a guessed
 deny. This is a deliberate reframe of what "the fixed floor" means
-compared to Gates 3/4: there, the floor is a local pattern match; here,
-it is an external, authoritative fact source, because the question
+compared to Gates 3 and 4. There the floor is a local pattern match.
+Here it is an external, authoritative fact source, because the question
 itself ("does this exist") has no local answer.
 
 ## The Jev-judged tier, reached only for a confirmed-real package
@@ -106,7 +112,7 @@ already-confirmed-real package (`resolved-safe`), never a guess.
 - **The third judgment named in the settled design - does the package
   match what the surrounding code actually needs - is not built.** It
   needs more context (the task, the file being edited) than one Bash
-  command carries; a residual gap, not a promise kept, noted for
+  command carries. It is a residual gap, not a promise kept, noted for
   whoever picks it up next.
 - **No wrapper unwrapping.** Gate 3's `unwrap()` sees through `sudo`,
   `env`, `bash -c`. This gate does not - `sudo npm install x` is not
@@ -127,25 +133,36 @@ already-confirmed-real package (`resolved-safe`), never a guess.
   too.
 - **Every package name checked is sent to a third-party service**
   (`registry.npmjs.org`/`pypi.org`), unauthenticated, with no way to opt
-  out short of disabling the whole gate. Unlike Gates 3/4/7, which only
-  ever call the operator's own TypeSafe API, this is the first gate that
-  reaches an outside service by default - worth knowing before enabling
+  out short of disabling the whole gate. Every other gate that makes a
+  network call only calls the Jev API, with your own key. This is the
+  only gate that sends data to npm or PyPI, with no key needed - worth
+  knowing before enabling
   it on a project whose dependency names themselves should not appear in
   a third party's access logs (independent review, 2026-09-24).
 
 ## The exit-code contract
 
 Unchanged from Gates 3 and 4: exit 1 from a `PreToolUse` hook is
-**neither allow nor block**, so the command runs. Every path here
-reaches a deliberate 0 or an explicit JSON decision, including a
-failure to import this gate's own dependencies.
+**neither allow nor block**, so the command runs. So every path here
+ends in exit 0, with or without a JSON decision. A failure to import
+this gate's own dependencies answers ask. Any other unhandled error,
+including stdin that is not JSON, is written to
+`~/.jev-gates/hook-errors.log` and answered ask with rule
+`internal-error`.
+
+The hook timeout is 30 seconds in both `hooks/hooks.json` and
+`install.py`. Inside it the gate keeps its own 29-second budget and
+skips a Jev call it has no time to finish. Each registry lookup has its
+own 5-second timeout and does not check that budget.
 
 ## What it writes
 
-Every deny, every ask, and a `jev-judged-abandoned` allow are recorded:
-a JSONL decision line at `~/.jev-gates/gate2.jsonl`, and a SARIF finding
-in the shared store so a later gate can see it - same shape as Gates 3
-and 4.
+Every decision on a Bash command, and on a PowerShell command that names
+an install, is logged as a JSONL line at `~/.jev-gates/gate2.jsonl`,
+allows included. The command text is kept only for a deny or an ask. A
+deny, an ask, or a `jev-judged-abandoned` allow also writes a SARIF
+finding to the shared store, so a later gate can see it, when the hook
+payload carries a `session_id`.
 
 ## How to run it
 
@@ -153,9 +170,15 @@ The hook is wired in `hooks/hooks.json` at the repository root. To check
 it by hand:
 
 ```console
-echo '{"tool_name":"Bash","tool_input":{"command":"npm install left-pad"}}' \
-    | python skills/package-check/scripts/package_check.py
+echo '{"tool_name":"Bash","tool_input":{"command":"npm install jev-seatbelts-eval-nonexistent-marker-pkg-2026"}}' \
+    | GATE2_ENABLED=1 python skills/package-check/scripts/package_check.py
 ```
+
+This prints a deny with rule `package-not-found`. It makes one live
+request to the npm registry, no Jev call, and appends one line to the
+decision log. The gate is off unless `GATE2_ENABLED` is set. A real
+package name would also reach a Jev call when a key is configured, and
+that call is billed.
 
 `--selfcheck` is fully offline - the registry lookup itself is mocked
 (no network call), and every assertion that could reach the jev-judged
@@ -173,7 +196,7 @@ python skills/package-check/scripts/eval_gate2.py
 
 | Variable | Meaning |
 | --- | --- |
-| `GATE2_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. |
+| `GATE2_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. `install.py` sets it to `1` when it is absent and never overwrites it. A plugin install through `hooks/hooks.json` sets nothing, so set it yourself there. |
 | `GATE2_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate2.jsonl`. |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. Same store every other gate already uses. |
 
@@ -182,7 +205,9 @@ python skills/package-check/scripts/eval_gate2.py
 The eval is 9 cases, stored baseline at `evals/baseline/gate2.json`,
 passing 9/9: two fixed-floor cases (a name that has never existed on
 either registry, denied with no Jev call), two "not an install"
-negatives, two path/URL/flag-value negatives, and two `judged` cases
+negatives (`git status` and a bare `npm install`), three
+path/URL/flag-value negatives (a local path, a VCS URL, and pip's `-r`
+value), and two `judged` cases
 that make a real Jev call on a real, well-known package. Live-verified
 separately (not part of the eval's own record): the DENY path on a
 fabricated name, an ALLOW on a real package with the package/ecosystem

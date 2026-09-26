@@ -19,7 +19,7 @@ it stops the same idea being re-litigated.
 | `muratcankoylan/...` project-development | MIT | One skill, not a directory of skills |
 | `muratcankoylan/...` self-improvement-loops | MIT | One skill, not a directory of skills |
 | `github/spec-kit` | MIT | GitHub-owned, Python CLI, active |
-| `affaan-m/ECC` (skills) | MIT | 292 skills, active |
+| `affaan-m/ECC` (skills) | MIT | 292 skills as read on 2026-09-20, active |
 | `docs.typesafe.ai/cookbooks/skill_suggestion` | Vendor docs | Highest authority source here |
 
 Two of the GitHub star counts returned by the API were implausible for the
@@ -40,6 +40,8 @@ and reviewed per release.
 Eight vendor statements were checked against this pipeline. Two bite.
 
 ### Confirmed defect 1: we request an alias, not a pinned version
+
+Fixed since: `lib/jevgate.py` now pins `jev-1.13.0`. As first found:
 
 `lib/jevgate.py` requests `jev-latest`. The vendor is explicit: an alias
 moves when a new release ships, and if you have tuned thresholds against a
@@ -354,7 +356,8 @@ as strong evidence of what is worth checking, and no evidence at all that
 prompt-level checking holds. Our hooks are stronger than its gates, which is
 an advantage to preserve rather than a gap to close.
 
-One reward-hacking figure worth carrying: a published study found
+One reward-hacking figure worth carrying, as read on 2026-09-20. The study
+was not named when this was written, so treat the figure as unverified. It found
 reward-hacking attempts in 30.4% of runs where the model could see the
 scoring function, against 0.7% where it could not. Gate rule text that the
 gated agent can read is a scoring function it can see.
@@ -376,6 +379,8 @@ What the validation found in our own code: `json.load` accepts the bare
 `NaN` literal, and Gate 3's Jev tier compared `danger >= threshold`
 directly, so a NaN answer allowed a gray-zone command. Nine other readers
 across the gates read answers the same unchecked way. All ten now go through `noul_p()`.
+The offline script `calibrate_gate3_thresholds.py` is not a gate and still
+reads the raw value.
 
 Deferred, with reasons:
 
@@ -391,16 +396,6 @@ Deferred, with reasons:
 - An answer cache. Hook inputs rarely repeat exactly. Add it when the logs
   show they do.
 - jevmeter's AUC question eval. Already covered by `lib/calibration.py`.
-- shapeshift's near-tie "choose" state and choice validation. No gate asks
-  a choice question.
-
-## Open item, outside this repository
-
-Upstream ECC's `rules/common/agents.md` carries a Delegation Completion
-Contract that the locally installed copy lacks: the final message is the
-deliverable, a spawned task is not a completed task, whoever delegates owns
-collection, and fire-and-forget delegation is forbidden. Its recorded
-rationale is an observed failure where agents spawned children and returned
-"waiting" as their final answer, orphaning every result. Port as a targeted
-insert, never a file replacement, because the local copy carries a Codex
-routing block and better model version pins that upstream does not have.
+- shapeshift's near-tie "choose" state and choice validation. When this
+  was written no gate asked a choice question. Gate 7's self-tune now
+  does, and checks the answer with `jevgate.choice_p()`.

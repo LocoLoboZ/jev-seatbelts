@@ -1,5 +1,5 @@
 {
-  "description": "Jev gates. Gate 1 (plan gate) inspects a plan before ExitPlanMode runs - deterministic work-class triage first (a one-line fix passes with no model call), then, only for the feature class, ten deterministic checks and exactly one Jev call carrying five judgement fields, returning go/needs-clarification/block. Gate 2 (package check) inspects a Bash command that installs an npm or PyPI package - a registry lookup confirms the name exists before Jev judges typosquat resemblance and abandonment, with a package that does not exist denied outright and no model call needed. Gate 3 (command safety) inspects a shell command or edit before it runs with a deterministic parser, and asks Jev only about a command the parser cannot resolve (failing closed if Jev cannot answer). Gate 5's stall check runs after each Bash or edit tool call and, with no model call, warns the agent when the same test failure has come back three times with edits in between. Gate 4 (commit screening, phase 1) inspects a git commit's staged diff for a hardcoded secret before the commit runs, also with no model call. Gate 6 (code quality) measures the same staged diff against seven fixed rules (five deterministic, one Jev, one hybrid) and records what it finds to the shared finding store - it never denies or asks, only flags a strong finding via additionalContext, because a measurement gate has no standing to block a local, reversible commit. Gate 7 (completion check) asks Jev whether a stop is premature and sends the agent back to work if so. Gate 7 is registered on Stop and on SubagentStop, because a Stop fired inside a subagent is converted to SubagentStop at runtime and would otherwise never reach the gate. The pipeline drift check (P8) runs once per session on SessionStart, asking Jev four fixed known-answer probes to check its own judgment still looks right - it decides nothing and blocks nothing, it only surfaces a warning via additionalContext if Jev's answers on obvious cases look wrong. Gate 7's self-tune also starts on SessionStart, at most once a day, in the background: it labels new Gate 7 decisions from the human's next reply and moves a threshold only inside fixed guardrails. All gates and the drift check are inert until their own enable variable is set: GATE1_ENABLED, GATE2_ENABLED, GATE3_ENABLED, GATE4_ENABLED, GATE5_STALL_ENABLED, GATE6_ENABLED, GATE7_ENABLED, GATE7_SELFTUNE_ENABLED and DRIFTGUARD_ENABLED.",
+  "description": "Jev gates. Gate 1 (plan gate) inspects a plan before ExitPlanMode runs - deterministic work-class triage first (a one-line fix passes with no model call), then, only for the feature class, a set of deterministic checks and exactly one Jev call carrying five judgement fields, returning go/needs-clarification/block. Gate 2 (package check) inspects a Bash or PowerShell command that installs an npm or PyPI package - a registry lookup confirms the name exists before Jev judges typosquat resemblance and abandonment, with a package that does not exist denied outright and no model call needed. Gate 3 (command safety) inspects a shell command or edit before it runs with a deterministic parser, and asks Jev only about a command the parser cannot resolve (failing closed if Jev cannot answer). Gate 5's stall check runs after each Bash or edit tool call (not PowerShell) and, with no model call, warns the agent when the same test failure has come back three times with edits in between. Gate 4 (commit screening) inspects a git commit's staged diff before the commit runs: a fixed regex scan for a hardcoded secret first, then, with a key and enough time, one Jev call asking whether the diff hides a secret the regex cannot phrase and whether it touches risk-sensitive ground. Without Jev it falls back to the regex verdict. Gate 6 (code quality) measures the same staged diff against seven fixed rules (five deterministic, one Jev, one hybrid) and records what it finds to the shared finding store - it never denies or asks, only flags a strong finding via additionalContext, because a measurement gate has no standing to block a local, reversible commit. Gate 7 (completion check) asks Jev whether a stop is premature and sends the agent back to work if so. Gate 7 is registered on Stop and on SubagentStop, because a Stop fired inside a subagent is converted to SubagentStop at runtime and would otherwise never reach the gate. The pipeline drift check (P8) runs once per session on SessionStart, asking Jev four fixed known-answer probes to check its own judgment still looks right - it decides nothing and blocks nothing, it only surfaces a warning via additionalContext if Jev's answers on obvious cases look wrong. Gate 7's self-tune also starts on SessionStart, at most once a day, in the background: it labels new Gate 7 decisions from the human's next reply and moves a threshold only inside fixed guardrails. Installed as a plugin through this file, all gates and the drift check are inert until their own enable variable is set: GATE1_ENABLED, GATE2_ENABLED, GATE3_ENABLED, GATE4_ENABLED, GATE5_STALL_ENABLED, GATE6_ENABLED, GATE7_ENABLED, GATE7_SELFTUNE_ENABLED and DRIFTGUARD_ENABLED. install.py sets each of these to 1 when it is absent and never overwrites a value already set.",
   "hooks": {
     "PreToolUse": [
       {
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/command-safety/scripts/command_safety.py\"",
-            "timeout": 10,
+            "timeout": 30,
             "statusMessage": "Gate 3 is checking the command"
           }
         ]
@@ -30,7 +30,7 @@
           {
             "type": "command",
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/commit-screening/scripts/commit_screening.py\"",
-            "timeout": 10,
+            "timeout": 30,
             "statusMessage": "Gate 4 is checking the commit"
           }
         ]
@@ -41,7 +41,7 @@
           {
             "type": "command",
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/package-check/scripts/package_check.py\"",
-            "timeout": 10,
+            "timeout": 30,
             "statusMessage": "Gate 2 is checking the package"
           }
         ]

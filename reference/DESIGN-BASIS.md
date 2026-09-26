@@ -3,18 +3,18 @@
 Pulled 2026-09-20. Three local sources examined directly (file paths below are
 this machine's, kept for traceability, not portable):
 
-1. `obra/superpowers` (MIT, 288,948 stars) — the real project `jev-superpowers`
+1. `obra/superpowers` (MIT, 288,948 stars) - the real project `jev-superpowers`
    copied. Already installed locally as `superpowers:*`.
 2. Matt Pocock's skills pack (`mattpocock-skills`, installed locally).
 3. Anthropic's own `skill-creator` (installed locally, the official
    skill-authoring tool).
 
-None of the actual file contents are copied into this repo — licensing and
+None of the actual file contents are copied into this repo - licensing and
 repo-bloat reasons. This is our own synthesis, citing where each idea came from.
 
 ## Per-gate findings
 
-### Gate 5 — debug triage (biggest upgrade available)
+### Gate 5 - debug triage (biggest upgrade available)
 
 `jev-superpowers` did: pipe test output into `jev-axi triage`, score 2-3
 guesses, act on the top one.
@@ -29,9 +29,9 @@ longer fails).
 hypothesis-ranking step (phase 3), to score the 3-5 hypotheses instead of us
 guessing the order. Cheap, fast, and it doesn't replace the rigour.
 
-### Gate 4 — commit screening (upgrade available)
+### Gate 4 - commit screening (upgrade available)
 
-`jev-superpowers` did: `git jev check` — secret/backdoor probability scan,
+`jev-superpowers` did: `git jev check` - secret/backdoor probability scan,
 pass/fail on a threshold.
 
 Matt Pocock's `code-review` skill does a two-axis diff review (Standards: does
@@ -48,16 +48,19 @@ before a PR, before a push to a shared branch).
 `superpowers` ships a real, working example: `hooks/hooks.json` registers a
 `SessionStart` hook that shells out to a script (`run-hook.cmd`). This is our
 template for how gates 3 (command safety) and 4 (commit screening) actually
-plug into Claude Code's `PreToolUse` hook — not a new invention, a known-good
+plug into Claude Code's `PreToolUse` hook - not a new invention, a known-good
 pattern already in production on this machine.
 
-### Gates 1, 2, 3, 6, 7 — no local example beats the original sketch
+### Gates 1, 2, 3, 6, 7 - no local example beats the original sketch
 
 Architecture pick (1), package/dependency check (2), command safety (3), code
 quality (6), and completion check (7) had no directly superior local example
 in these three sources. They stay close to the original `jev-superpowers`
 shape, still rebuilt as our own scripts against the Jev API directly (see
-main README for why — no third-party binaries).
+main README for why - no third-party binaries).
+
+Later superseded. Every one of these five was replanned further down this
+file, so none of them is close to the `jev-superpowers` shape as built.
 
 Note: for gate 3 specifically, `hex/claude-guard` (MIT, from the earlier
 `finding-agent-skills` pass) is the closest external pattern reference, not
@@ -84,10 +87,10 @@ read-through. Worth using once we have a first draft of each gate skill.
 
 ## Loop infrastructure: already have it, don't build new
 
-Two more locally-installed skills cover the "eval loop" need directly — no
+Two more locally-installed skills cover the "eval loop" need directly - no
 new loop infrastructure required.
 
-### `ralph-loop` — reuse the mechanism, replace the weak check
+### `ralph-loop` - reuse the mechanism, replace the weak check
 
 Already has a working Claude Code Stop hook (`hooks/stop-hook.sh` +
 `hooks/hooks.json`, both read directly): it blocks session exit until a
@@ -96,7 +99,7 @@ each iteration, bounded by `--max-iterations`.
 
 **Confirmed weak spot** (read the actual gating logic): it is a plain text
 match on the promise string. Claude could print the phrase without the work
-being genuinely done and the hook lets it through — no real evidence check.
+being genuinely done and the hook lets it through - no real evidence check.
 
 **This is exactly Gate 7's job.** Plan: reuse `ralph-loop`'s Stop hook
 plumbing as-is (it already correctly blocks exit and handles session
@@ -104,7 +107,7 @@ isolation, iteration counting, corrupted-state recovery). Replace only its
 string-match check with a call to Jev that verifies real evidence (test
 exit code, diff content) before allowing exit. Surgical swap, not a rebuild.
 
-### `loopy-loop-engineering` — the outer loop, already governed
+### `loopy-loop-engineering` - the outer loop, already governed
 
 A general bounded-loop framework already built with the discipline we need:
 observe → choose → act → verify → record → stop, with an evidence receipt,
@@ -112,7 +115,7 @@ audit/debrief support, and an explicit refusal to run unsupervised
 destructive actions without authorisation.
 
 **Plan**: use this as the outer loop for building and refining the gate
-skills themselves — draft a gate skill, test it, review the evidence
+skills themselves - draft a gate skill, test it, review the evidence
 receipt, improve, repeat. This is the same eval loop Anthropic's
 `skill-creator` described; `loopy-loop-engineering` already implements the
 governed version of it, so we run it rather than inventing our own.
@@ -124,11 +127,11 @@ outcome, including "zero subagents" as a valid, preferred answer. Two
 concrete tie-ins found:
 
 1. **Gates stay lean.** Matt Pocock's `code-review` (Gate 4) runs two full
-   parallel subagents on every diff — fine for a risky commit, wasteful for
+   parallel subagents on every diff - fine for a risky commit, wasteful for
    a one-line fix. Plan: Jev's fast secret-scan runs on every commit always;
    the selector decides, per commit, whether the diff earns the full
    two-subagent review or stays parent-only. Same logic applies to Gate 5's
-   debugging loop — only escalate to extra agents when the bug actually
+   debugging loop - only escalate to extra agents when the bug actually
    needs it.
 2. **Jev's own score becomes an orchestration input, not just an output.**
    Gate 1 (architecture pick) already produces a Jev confidence number.
@@ -138,7 +141,7 @@ concrete tie-ins found:
 
 **Standing constraint that overrides the selector**: this operator's own
 CLAUDE.md requires independent Codex review (not self-review) for anything
-touching secrets, access, or git — and Gate 4 screens commits for leaked
+touching secrets, access, or git - and Gate 4 screens commits for leaked
 secrets. So Gate 4 needs the mandatory Codex route on top of whatever the
 selector decides, regardless of how small the selector judges the diff.
 This is a hard rule, not a cost trade-off, and it doesn't move.
@@ -147,7 +150,7 @@ This is a hard rule, not a cost trade-off, and it doesn't move.
 
 `anthropic-skills:dbs-framework` (local) was benchmarked against
 `skill-creator`. DBS's own text says to use it *alongside* skill-creator and
-explicitly hands off file-generation and eval-testing to it — they solve
+explicitly hands off file-generation and eval-testing to it - they solve
 different problems, not the same one.
 
 - **DBS's unique value**: a structural decision step before any file is
@@ -156,18 +159,20 @@ different problems, not the same one.
   an API call (+ Solutions)? DBS's own rule: an external API call requires a
   Solutions script. Every one of our 6 gates calls the Jev API directly, so
   DBS's decision tree resolves the same way for all 6: Direction +
-  Blueprints + Solutions.
+  Blueprints + Solutions. (Written before the build. There are seven
+  gates, and as built each one decides most cases in code first, calling
+  Jev only for the judgment code cannot make.)
   - `SKILL.md` (Direction) = the gate's trigger + workflow
   - `references/` (Blueprints) = the borrowed methodology per gate (Matt
     Pocock's 6-phase debug discipline, the confidence/probability thresholds
     logged above)
-  - `scripts/` (Solutions) = the actual script calling Jev directly — no
+  - `scripts/` (Solutions) = the actual script calling Jev directly - no
     third-party binary, per the original decision in the main README
-- **skill-creator's unique value**: the eval loop DBS defers to — draft,
+- **skill-creator's unique value**: the eval loop DBS defers to - draft,
   write test prompts, run them, review, iterate. DBS does not replace this.
 - **Independent corroboration, not new information**: both sources
   separately state descriptions must be written "pushy" because Claude
-  under-triggers vague ones. Same rule, found twice — strengthens the
+  under-triggers vague ones. Same rule, found twice - strengthens the
   existing hard requirement on gates 3 and 4 especially.
 - **Build order for us**: DBS first, per gate, to settle the file layout →
   then skill-creator's eval loop to build and test it. Not either/or.
@@ -175,32 +180,33 @@ different problems, not the same one.
 ## Community artefacts found via `awesome-jev` (yibie/awesome-jev)
 
 Checked 2026-09-20. This list has its own built-in warning about bulk,
-same-day, unproven submissions — the exact pattern we already caught with
+same-day, unproven submissions - the exact pattern we already caught with
 `jev-superpowers`. Well-curated, not itself a risk (it's a markdown index).
 Three findings that close open gaps:
 
-- **`jev-axi` (shiftynick, MIT, 17 stars, pushed yesterday) — fills Gate 3.**
+- **`jev-axi` (shiftynick, MIT, 17 stars, pushed yesterday) - fills Gate 3.**
   PreToolUse command-safety gate for Claude Code. Key pattern worth copying:
   it decides routine, obviously-safe commands **locally, without calling
   Jev**, and only sends genuinely uncertain ones to the API. Directly answers
   the call-volume/cost gap too. Evaluated on its own repository and history,
   independently of the bundle.
-- **`jev-commit` (valentynkit, MIT, 5 stars, pushed yesterday) — pattern
+- **`jev-commit` (valentynkit, MIT, 5 stars, pushed yesterday) - pattern
   reference for Gate 4.** One Jev call per commit: message-matches-diff
   check, debug-leftover flag, blocks only on an actual detected secret.
   Small, focused, and again independent of the rejected bundle.
-- **Skip: `jev-git`** — shipped as part of the same rejected
+- **Skip: `jev-git`** - shipped as part of the same rejected
   `jev-superpowers` bundle. 1 star, 6KB, no track record, and it inherits
   the bundle's third-party-authority problem. Not adopted on those grounds.
 - **SDK confirmation**: official SDKs are at `docs.typesafe.ai/sdk/python.md`
-  and `.../sdk/javascript.md` (there's also an unofficial PyPI `jevclient` —
+  and `.../sdk/javascript.md` (there's also an unofficial PyPI `jevclient` -
   use the official one). Still need to actually read that page and make one
-  real test call — this closes "where to look," not "done."
+  real test call - this closes "where to look," not "done." (Real calls
+  were made the same day, see "Live API verification" below.)
 
 ## Gate 7 upgrade: the real `limpet` found, plan changes
 
 The original `jev-superpowers` bundle table listed `KSym04/limpet` as its
-completion-gate tool. **Checked directly — that repo is something else
+completion-gate tool. **Checked directly - that repo is something else
 entirely** (an unrelated Rust AI-memory/MCP-server project). A concrete,
 checkable broken link in the bundle we already rejected, and it confirms
 we were right to reject it.
@@ -218,7 +224,7 @@ already does exactly what we were planning to build by hand:
   loop forever
 
 **Plan change**: Gate 7 no longer means "bolt Jev onto `ralph-loop`
-ourselves." It means adapt `limpet` directly — it's small enough to read in
+ourselves." It means adapt `limpet` directly - it's small enough to read in
 full, and it already is the design we were sketching. `ralph-loop` remains
 useful as a second reference for the max-iteration/session-isolation
 plumbing, but `limpet` is now the primary pattern for Gate 7.
@@ -228,7 +234,7 @@ plumbing, but `limpet` is now the primary pattern for Gate 7.
 Every confidence threshold used across this doc (0.80 for architecture pick,
 p<0.10 for secrets, 0.70 for hypothesis ranking) was copied from
 `jev-superpowers`'s README, never independently validated. Found a
-candidate fix: **`jevcal`** (abhixhek, MIT, 8 stars) — described here at
+candidate fix: **`jevcal`** (abhixhek, MIT, 8 stars) - described here at
 the time as fitting a per-question threshold to a target accuracy on
 labelled examples and drift-checking it against a held-out split.
 
@@ -307,10 +313,10 @@ n comfortably clears a number that supports an actual held-out split,
 and only then treat a fitted threshold as more than a direction.
 
 **Caution worth keeping in view**: the same evaluation category also shows
-Jev *losing* benchmarks — it didn't beat plain vector search on a
+Jev *losing* benchmarks - it didn't beat plain vector search on a
 33k-document reranking test, and failed 4 of 6 conditions on a product-
 relevance ranking benchmark. Jev is not a universal win. Don't assume it
-will outperform a simpler check just because it's typed and fast — verify
+will outperform a simpler check just because it's typed and fast - verify
 per gate, the same way `jevcal` verifies thresholds.
 
 ## Skill-triggering reliability: a second layer beyond "pushy descriptions"
@@ -341,8 +347,10 @@ compose rather than compete. Full evidence in `PIPELINE-RESEARCH.md`.
 ## Status
 
 Superseded below. Gate 7 (completion check) is built and evaluated, in
-`skills/completion-check/`. Gates 1 to 6 are design only, and the plans for
-Gates 3, 4 and 6 were replanned after the gstack review - see the final
+`skills/completion-check/`. Gates 1 to 6 were design only at that point
+(all seven are built now, see "Current state, 2026-09-26" at the end), and
+the plans for Gates 3, 4 and 6 were replanned after the gstack review - see
+the final
 section of this file, which overrides anything above it for those gates.
 
 ---
@@ -354,13 +362,13 @@ against `POST https://api.typesafe.ai/v1/systemone`, model alias `jev-latest`,
 served by `jev-1.13.0`. Credential lives in the Windows **User** environment
 variable `TYPESAFE_API_KEY` (not exported into bash; read it via
 PowerShell `[Environment]::GetEnvironmentVariable(...,'User')`). No key is
-stored in this repo or in `.claude/settings.json` — settings only registers
+stored in this repo or in `.claude/settings.json` - settings only registers
 the `typesafe@typesafe-ai` plugin.
 
 ### Confirmed request/response shape
 
 Request: `{ model, state, questions }`. `state` may be a nested object, and
-questions reference it with backticked paths (`` `candidate_imports[3]` ``) —
+questions reference it with backticked paths (`` `candidate_imports[3]` ``) -
 verified working, not just documented. Response: `{ model, answers, usage }`,
 answers keyed by the same ids. Noul returns `noul` only (no confidence).
 Choice returns `choice` + `probabilities` + `confidence`. Score returns
@@ -368,24 +376,24 @@ Choice returns `choice` + `probabilities` + `confidence`. Score returns
 
 Measured: 3 parallel questions, 588 in / 73 out tokens, **995 ms**. Second
 call, 5 questions, **969 ms**. Parallel questions in one request are
-effectively free latency-wise — this supports the "ask independent questions
+effectively free latency-wise - this supports the "ask independent questions
 together" guidance and makes per-gate multi-question calls affordable.
 
 Gate 3 probe result (a recursive force-delete aimed at a real user document
 directory, with the stated intent "clean up build artefacts"):
 `is_destructive` 0.95, `verdict` = block at 0.99 / confidence 0.98,
 `intent_match` 0.03 of 2. Jev detects intent/command mismatch, not just
-dangerous syntax — a string-match hook cannot do this.
+dangerous syntax - a string-match hook cannot do this.
 
 Noted in passing: a string-match `PreToolUse` guard already runs on this
-machine, and it blocked the probe twice — not because a dangerous command
+machine, and it blocked the probe twice - not because a dangerous command
 was being run, but because the dangerous string appeared inside a JSON file
 being *written* and inside documentation being *appended*. Two false
 positives in one session, on a gate that never had to make a judgment. That
 is precisely the failure class Gate 3 is meant to replace, and it is now a
 real logged example to use as a Gate 3 eval case.
 
-### Decision — Gate 2 is NOT a Jev-first gate (resolves open question 3)
+### Decision - Gate 2 is NOT a Jev-first gate (resolves open question 3)
 
 Tested directly. Jev asked whether npm packages exist, against registry
 ground truth:
@@ -399,7 +407,7 @@ ground truth:
 
 Fabricated names sit at 0.38-0.41 and a real package sits at 0.71. There is
 no threshold that separates them. Package existence is a fact lookup, and
-Jev returns calibrated judgment over supplied state, not retrieved fact —
+Jev returns calibrated judgment over supplied state, not retrieved fact -
 exactly what the TypeSafe skill means by "keep exact lookups in code".
 
 But the *shape* question worked: asked how much the name reads like an LLM
@@ -407,7 +415,7 @@ invention, Jev returned 1.89 of 2 at confidence 0.84.
 
 **Gate 2 design, settled**: the registry lookup is the gate (deterministic,
 free, authoritative, in `scripts/`). Jev runs only *after* the facts are
-fetched, on the judgments a lookup cannot make — typosquat resemblance to a
+fetched, on the judgments a lookup cannot make - typosquat resemblance to a
 popular package, abandonment given last-publish date and download counts,
 and mismatch between the package and what the code actually needs. Registry
 fact first, Jev judgment second. This is the same "verify and escalate"
@@ -416,26 +424,30 @@ shape the docs describe.
 This is also the first concrete instance of the doc's own standing caution:
 Jev is not a universal win, verify per gate.
 
-### Decision — failure behaviour when Jev is unreachable (open question 2)
+### Decision - failure behaviour when Jev is unreachable (open question 2)
 
 Principle: a gate that silently allows on failure is not a gate. A gate that
 hard-blocks on failure makes the whole toolchain hostage to one API.
 
-- **Gate 3 (command safety)** — fail **closed to confirm**, never to silent
+- **Gate 3 (command safety)** - fail **closed to confirm**, never to silent
   allow. The local allowlist (the `jev-axi` pattern) resolves obviously-safe
   commands with no API call at all, so an outage only reaches commands
   already judged uncertain. For those, the gate asks the operator instead of
-  deciding. Timeout 3 s, one retry, then confirm-prompt.
-- **Gate 4 (commit screening)** — fail **open to a local regex secret scan**.
+  deciding. Timeout 3 s, one retry, then confirm-prompt. (Superseded. As
+  built, Gate 3's Jev tier fails closed to deny by default when Jev is
+  unreachable or no key is set. The shared call timeout is 8 s with two
+  retries, after 1 s and 2 s.)
+- **Gate 4 (commit screening)** - fail **open to a local regex secret scan**.
   A commit is local and reversible; blocking all commits during an API
   outage is disproportionate. The deterministic regex scan still blocks on a
   detected secret, and the commit is marked as unscreened by Jev.
-- **Push / PR time** — fail **closed**. That is where a leaked secret leaves
-  the machine and stops being reversible. No push proceeds unscreened.
-- All other gates (1, 5, 6, 7) — fail open with a visible warning. None of
+- **Push / PR time** - fail **closed**. That is where a leaked secret leaves
+  the machine and stops being reversible. Decided, but not built. No gate
+  screens a push or a PR, so a push is not screened today.
+- All other gates (1, 5, 6, 7) - fail open with a visible warning. None of
   them are the last line of defence against an irreversible action.
 
-### Decision — Gate 3 needs mandatory Codex review (open question 4)
+### Decision - Gate 3 needs mandatory Codex review (open question 4)
 
 Yes. Confirmed, matching the treatment already agreed for Gate 4. The
 operator's CLAUDE.md names "production or safety-critical operations" as a
@@ -517,7 +529,8 @@ contained a dangerous string, appending documentation that quoted one, and
 `git rm --cached`, which deletes nothing from disk. None was a destructive
 command; all three were text handling or an index operation.
 
-Gate 3 must therefore match on the **parsed command of a Bash tool call**,
+Gate 3 must therefore match on the **parsed command of a Bash tool call**
+(and of a PowerShell tool call, since 2026-09-26, see RR-18),
 never on the raw text of any tool payload, and `git rm` without a recursive
 flag must not match the recursive-delete family at all. These go in the eval
 as named regression cases.
@@ -622,7 +635,7 @@ namely that gates have nowhere shared to write.
 
 **P1. Nothing gates the plan or spec stage.** All seven gates fire at or after
 implementation. The cheapest point to stop wrong work is before any code
-exists.
+exists. (Built 2026-09-24 as Gate 1, `skills/plan-gate/`.)
 
 **Resolution amended 2026-09-20 after external review. The first answer here
 was half wrong.** It read: Gate 1 is already close to this gate, just aimed
@@ -657,14 +670,15 @@ may block. See `prior_findings()` in the completion-check script.
 P2 is not closed. Only the read side exists, and nothing writes yet, so the
 concrete failure above is still live in practice. It closes when a gate that
 finds something writes it. That is now a one-call change per gate rather than
-a redesign, which was the point of building the store first.
+a redesign, which was the point of building the store first. (Closed later
+the same day, see "Gate 3 built, and P2 closed" below.)
 
 **P3. No end-to-end eval.** Each gate has its own eval cases and
 `lib/evalharness.py` runs them per gate against a stored baseline. Nothing
 runs one realistic session through every enabled gate and scores the result.
 Consequence for evidence claims: seven passing gates is not evidence that the
-pipeline works, only that its parts do. The pipeline is currently untested and
-must not be described otherwise.
+pipeline works, only that its parts do. The pipeline was untested at this
+point. (Built 2026-09-23 as `evals/eval_pipeline.py`, see "P3 built" below.)
 
 ### The remaining nine
 
@@ -926,18 +940,23 @@ it, and it is good at that. Anything needing a file written or a check
 executed is verified here.
 
 P4 is closed as a mechanism. It is not closed as a pipeline: no gate calls it
-yet. P2 stays open until Gate 7 reads what an earlier gate wrote.
+yet. P2 stays open until Gate 7 reads what an earlier gate wrote. (Both
+closed later, see "Gate 3 built, and P2 closed" below.)
 
 **P5. No feedback loop from gate logs back into the rules.** Hook failures and
 gate outcomes are recorded (commit `aecbca4`). Nothing reads that log.
 Thresholds and the Gate 3 tier lists stay static regardless of what actually
 happened. The four false positives produced by this machine's own string-match
 PreToolUse guard this session, against zero true catches, is precisely the
-data such a loop would consume.
+data such a loop would consume. (Partly built 2026-09-26: Gate 7's
+self-tune reads its own log and moves its thresholds inside fixed
+guardrails, see `skills/completion-check/references/CALIBRATION.md`. Gate
+3's tier lists and every other gate's thresholds are still static.)
 
 **P6. No pipeline-wide cost or call budget.** A per-gate internal budget exists
 (commit `aecbca4`). Nothing caps a whole session. Seven gates firing repeatedly
-across a long session is unbounded.
+across a long session is unbounded. (Built 2026-09-23, see "P6 built"
+below.)
 
 **P7. Gate behaviour inside subagents: tested 2026-09-21, Gate 3 DOES fire -
 first test's "zero coverage" verdict was a false positive, corrected same
@@ -1010,26 +1029,30 @@ rather than leaving it assumed either way.
 per gate against that gate's baseline. `jevcal` locks thresholds per question.
 Neither catches a Jev model bump that moves all seven gates at once, which is
 the case most likely to go unnoticed because no single baseline looks alarming.
+(Built 2026-09-23, see "P8 built" below.)
 
 **P9. No sanctioned bypass with an audit trail.** Gates obstruct legitimate work
 sometimes. With no logged one-time bypass, the realistic operator response is
 to disable the hook entirely, which yields no gate and no record. A bypass that
-is logged is strictly safer than a gate that gets switched off.
+is logged is strictly safer than a gate that gets switched off. (Built
+2026-09-23 for Gates 3 and 4, see "P9 built" below.)
 
 **P10. No way to ask which gates are live.** Gate 7 is built and switched off.
 Nothing in the repo answers "which gates are currently enabled" without reading
-`hooks/hooks.json` by hand. A status command closes this.
+`hooks/hooks.json` by hand. A status command closes this. (Built
+2026-09-23 as `lib/gate_status.py`, see "P10 built" below.)
 
 **P11. No aggregate failure state when Jev is unreachable.** Per-gate fail-open
 and fail-closed behaviour is settled and correct (see the open question 2
 decision above). What is missing is a single session-level signal. During an
 outage three gates degrade three different ways with no unified indication, at
-exactly the moment clarity matters most.
+exactly the moment clarity matters most. (Built 2026-09-23, see "P11
+built" below.)
 
 **P12. No precedence rule for disagreement or override.** If Gate 3 blocks a
 command and the operator overrides, Gate 4 later screens the resulting commit
 with no knowledge that an override occurred. Overrides need to land in the same
-shared store as findings.
+shared store as findings. (Built 2026-09-23, see "P12 built" below.)
 
 ### Build order implied by these gaps
 
@@ -1137,7 +1160,9 @@ and the diff-based path is still worth running once network is available.
 P7 is the one gap that cannot be closed by writing code alone. It requires an
 operator decision on whether Gates 3 and 4 fire inside subagents. Recommended
 answer is yes for those two, since they are the gates guarding irreversible
-actions. Not yet decided.
+actions. Not yet decided. (Settled 2026-09-21 by direct test: Gates 3 and
+7 do fire inside subagents, and Gate 4 is a PreToolUse hook like Gate 3,
+see P7 above.)
 
 ## The store is readable only by whoever created each file (2026-09-20, T7f)
 
@@ -1218,7 +1243,7 @@ verified-absent risk.
 Offline: all eight checks green
 (`jevgate`, `completion_check`, `command_safety`+`bashparse`, `evalharness`,
 `findings`, `gatelog`). No live Jev call made or needed for this change.
-Independent review not yet run — Codex is rate-limited, route to Antigravity
+Independent review not yet run - Codex is rate-limited, route to Antigravity
 per the carried note above.
 
 ## Gate 3 reframed: Jev steers, a fixed floor overrides (2026-09-21, T7f)
@@ -1227,7 +1252,7 @@ per the carried note above.
 read as a safety system with a human click at its centre (the "ask" tier
 opening a permission prompt). That is not the intent. The point of Jev in
 this pipeline is to steer build decisions on intent and optimisation, and the
-orchestration/build agents must follow that steer automatically — no click —
+orchestration/build agents must follow that steer automatically - no click -
 *unless* the steer would be destructive or detrimental to the build, in which
 case a fixed, non-negotiable floor overrides it. Where that floor and Jev's
 own judgment together produce a case genuinely too ambiguous for either to
@@ -1265,7 +1290,7 @@ write an original implementation, cited.
   Resolves rule scope (path/title globs, plain regex) in code first; a
   regex-detected secret short-circuits the whole pipeline to fail *without
   ever calling Jev*. Only the genuinely eligible rules are batched into one
-  capped Jev call. Acts on the result immediately — a GitHub Check Run is
+  capped Jev call. Acts on the result immediately - a GitHub Check Run is
   posted with no approval step.
 - **jev-belay** (github.com/valentynkit/jev-belay, MIT, 3 days old, 16
   stars, cites its own borrowing from a prior project called pi-warden).
@@ -1273,10 +1298,10 @@ write an original implementation, cited.
   changed this turn -> exit clean, no call) and a regex classifier of ~20
   test/build tool output formats. Only a genuine ambiguity (something
   changed, nothing proved it worked) spends a call. **A passing check is a
-  hard veto that Jev's verdict cannot override in either direction** —
+  hard veto that Jev's verdict cannot override in either direction** -
   directly reusable as the shape for our own destructive-command floor.
 - **jev-git** (github.com/AkashPriyadarshii/jev-git, MIT, 3 days old, 2
-  stars) — **the negative example.** No deterministic floor exists at all;
+  stars) - **the negative example.** No deterministic floor exists at all;
   the full diff is sent straight to Jev with one probability question, and
   it fails *open silently* on a missing key or any API error. This is the
   failure mode our fixed floor exists to prevent, found in the wild.
@@ -1287,13 +1312,13 @@ write an original implementation, cited.
   live secret prefixes, `curl|sh`, exfiltrating shell history, with a
   named carve-out for `git stash clear` after that command flipped to
   allow under every "a human already approved this" injection framing in
-  the author's own red-team test) — short-circuits with **no model call**;
+  the author's own red-team test) - short-circuits with **no model call**;
   (2) a fast allowlist of read-only commands, also no model call; (3) only
   then a Jev call, scored so low confidence can only add caution, never
   relax it. Its own docstring: "Denials come before the allowlist on
   purpose... a command name says nothing about its arguments." Ships a
   separate `MODE=observe` default that writes every decision to
-  `~/.jev-gate/decisions.jsonl` with **zero enforcement** — a working,
+  `~/.jev-gate/decisions.jsonl` with **zero enforcement** - a working,
   already-proven version of the register/detection-control idea, decoupled
   from live blocking. Caveat: it still fails *open* into `ask` on a missing
   key or timeout, which is a live design choice, not a mistake, but a
@@ -1301,7 +1326,7 @@ write an original implementation, cited.
 
 **What holds across all five real (non-jev-git) designs, independently
 arrived at:** a fixed, cheap, no-model-call layer resolves the clear cases
-first — either by matching known danger or by matching known safety. Jev is
+first - either by matching known danger or by matching known safety. Jev is
 spent only on genuine ambiguity. Nothing here requires a human click for an
 ordinary Jev-judged outcome. Confidence, where used, is only ever allowed to
 add caution, never to relax it.
@@ -1334,7 +1359,7 @@ changes:**
 3. Fast allowlist of provably-safe primitives: short-circuits to allow, no
    model call (from jev-axi, pr-sieve's scope-resolution step).
 4. Remaining, genuinely ambiguous commands go to Jev. Jev's verdict is
-   followed automatically — no human click.
+   followed automatically - no human click.
 5. Jev unreachable/timeout/malformed answer on step 4: record the decision
    and the failure to the register (gatelog/findings), and proceed per a
    stated policy rather than opening a permission prompt. Exact
@@ -1346,7 +1371,7 @@ changes:**
 
 Not yet implemented. Independent review required before this replaces the
 current ask-tier behaviour, since it removes a human confirmation step from
-a hook that currently gates command execution — Codex is rate-limited, route
+a hook that currently gates command execution - Codex is rate-limited, route
 to Antigravity.
 
 ## Gate 3 rebuilt to the reframed shape (2026-09-21, T7f)
@@ -2186,7 +2211,7 @@ should auto-edit on its own.
 ## Queued: rename the project (2026-09-21, T7f)
 
 `jev-integration` is a working name, not a public one. Renaming now is
-premature — the operator flagged that the gate design may still change
+premature - the operator flagged that the gate design may still change
 shape (which gates ship, how many, what the wrapper actually does) before
 anything is public, and a name should follow the finished shape, not guess
 ahead of it.
@@ -2556,8 +2581,8 @@ real, currently-live operational gap, versus being deferrable polish.
 | Score | Item | What it is |
 | --- | --- | --- |
 | 83% | P2/P4 write side | **Correction, see below: this scoring was run on a wrong premise.** Gates 3 and 4 already wrote to `lib/findings.py`'s shared store since 2026-09-20 (see "Gate 3 built, and P2 closed" above) - only Gate 5 was missing it, not all three. |
-| 77% | P3 | One real end-to-end pipeline eval, all enabled gates in one session, not just each gate's own suite |
-| 64% | P8 | Pipeline-level model drift check - a Jev version bump moving all seven gates at once, not caught by any per-gate baseline |
+| 77% | P3 | **DONE (2026-09-23).** One real end-to-end pipeline eval, all enabled gates in one session, not just each gate's own suite |
+| 64% | P8 | **DONE (2026-09-23).** Pipeline-level model drift check - a Jev version bump moving all seven gates at once, not caught by any per-gate baseline |
 | 61% | Gate 2 | **DONE (2026-09-24).** Build the package/dependency check gate (registry lookup first, Jev judgment second). |
 | 58% | Gate 3/7 calibration | **DONE (2026-09-23).** Extend the proven `lib/calibration.py` + `jevcal_calibrate.py` pattern from Gate 4 to Gate 3's tiers and Gate 7's `GATE7_BLOCK`. |
 | 56% | P12 | **DONE (2026-09-23).** Precedence rule for gate disagreement/override (e.g. a Gate 3 override Gate 4 never sees). |
@@ -2568,7 +2593,7 @@ real, currently-live operational gap, versus being deferrable polish.
 | 46% | P11 | **DONE (2026-09-23).** One unified "Jev is unreachable" session signal, instead of three (now six) gates degrading independently. |
 | 44% | Gate 1 | **DONE (2026-09-24).** Build the plan-stage gate (P1's amended resolution - deterministic triage, one Jev call for the feature class) |
 | 43% | Gate 6 | **DONE (2026-09-24).** Build the code-quality gate (measurement-gated specialist dispatch, `[NEVER_GATE]` carve-outs) |
-| 36% | P5 | Feedback loop from gate logs back into thresholds and Gate 3's tier lists |
+| 36% | P5 | **PARTLY DONE (2026-09-26), Gate 7 only.** Feedback loop from gate logs back into thresholds and Gate 3's tier lists |
 
 **Reading this ranking**: it corroborates the file's own existing "Build
 order implied by these gaps" note above P2/P4/P3 - Jev independently
@@ -2893,8 +2918,8 @@ function every gate depends on, which puts this squarely in scope for
 the standing review rule the moment Codex or Antigravity is next
 reachable - flagged here rather than deferred silently, the same
 discipline the last two commits' PENDING markers used. Codex was
-re-tried after this fix; failed the same way as before (`C:\Users\T
-1000\.codex\config.toml` still pins the unsupported `gpt-6-astra`, not
+re-tried after this fix. It failed the same way as before
+(`~/.codex/config.toml` still pins the unsupported `gpt-6-astra`, not
 fixed on the operator's end yet). A fresh self-contained review prompt
 covering both files is ready at `antigravity-jevgate-useragent-review-
 prompt.md` in this session's scratchpad, same substitution as the prior
@@ -4062,3 +4087,42 @@ Re-verified after all four fixes: `package_check.py --selfcheck`,
 `gate_status.py`'s own selfcheck, all ten module selfchecks, Gate 3 eval
 115/115 held, Gate 4 eval 9/9 held, Gate 2 eval 9/9 held against its own
 baseline.
+
+## Current state, 2026-09-26
+
+This file is a dated history. For how the gates work today, read these
+instead:
+
+- `README.md` for what each gate does, its status and its known gaps.
+- `skills/completion-check/references/CALIBRATION.md` for Gate 7's
+  thresholds and its self-tune.
+- `skills/command-safety/references/RESIDUAL-RISKS.md` for Gate 3's known
+  gaps, including RR-18 on how PowerShell is read.
+- `install.py` for what an install switches on.
+
+Fixed on 2026-09-26:
+
+- `install.py` sets `GATE1_ENABLED`, `GATE2_ENABLED`, `GATE3_ENABLED`,
+  `GATE4_ENABLED`, `GATE6_ENABLED`, `GATE7_ENABLED`, `GATE5_STALL_ENABLED`,
+  `GATE7_SELFTUNE_ENABLED` and `DRIFTGUARD_ENABLED` to 1 when absent. A
+  plugin install through `hooks/hooks.json` sets none of them.
+  `GATE5_ENABLED` is set by neither route.
+- Gates 1, 2 and 6 have a top-level crash guard. An unhandled error,
+  including stdin that is not JSON, is logged. Gates 1 and 2 then answer
+  ask, and Gate 6 exits 0.
+- The hook timeout for Gates 2, 3 and 4 went from 10 s to 30 s. Gates 1, 6
+  and 7 were already at 30 s.
+- `lib/gate_status.py` lists `GATE5_STALL_ENABLED` and
+  `GATE7_SELFTUNE_ENABLED`.
+- Gate 3 reads `cmd /c`, `cmd //c` and `cmd /k` on the Bash tool path as
+  unreadable. They go to Jev, and with no key they are denied.
+- Gate 3's Jev tier fails closed by default. Jev unreachable or no key
+  means deny. The shared call timeout is 8 s, with retries after 1 s and 2 s.
+- Gate 7's 0.75 block and 0.50 warn thresholds were checked once against
+  real operator-labelled stops and kept. They are checked defaults, not
+  values fitted per rule. Held-out AUROC for the main blocking rule was
+  0.50, so that rule separates those stops no better than chance.
+
+Still not built: push and PR screening (see "Decision - failure behaviour
+when Jev is unreachable" above), and the P5 feedback loop for any gate
+other than Gate 7.

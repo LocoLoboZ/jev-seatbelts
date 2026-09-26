@@ -6,8 +6,9 @@ description: >
   `reference/PIPELINE-RESEARCH.md` - five deterministic, one Jev (depth),
   one hybrid (interface-as-test-surface). Never denies or asks: this is a
   measurement gate, not a safety gate, and it has no standing to block a
-  local, reversible commit. Writes a SARIF finding per rule that fires to
-  the shared store and flags only a `strong` finding via
+  local, reversible commit. Writes one SARIF finding per result to the
+  shared store (only when the hook input carries a session id) and flags
+  only a `strong` finding via
   `additionalContext`. Before running any rule (deterministic or Jev),
   checks whether that rule has found nothing across its last ten or more
   dispatches and, if so, skips it - except `dependency-category` and
@@ -26,7 +27,8 @@ staged diff, each answered strong / worth-exploring / speculative rather
 than a continuous score - "hold the vocabulary fixed, a rule whose wording
 drifts cannot hold a calibrated threshold."
 
-It runs as a Claude Code `PreToolUse` hook on the `Bash` tool, the same
+It runs as a Claude Code `PreToolUse` hook on the `Bash` and `PowerShell`
+tools (matcher `Bash|PowerShell`), the same
 matcher and the same `git commit` detection Gate 4 already uses, and reads
 the same staged diff Gate 4 reads (its own copy of the same helper
 functions - gates in this pipeline are self-contained scripts, not a
@@ -40,12 +42,14 @@ package, a dangerous command, a leaked secret). Code quality is not that
 kind of question - a seam with one implementation, a slightly worse health
 delta, a hot-spot file are all things worth *knowing*, not things that
 justify stopping a local, reversible commit. Gate 4's own `jev-risk-tier`
-flag already established this shape (allow, but flag); Gate 6 is that
+flag already established this shape (allow, but flag). Gate 6 is that
 shape all the way down, for every one of its seven rules, with no deny or
-ask path at all. A rule that could not run (a `git log`/`git grep` call
-failing, an unreadable diff) is logged and silently skipped, never turned
-into an ask - blocking a commit over a measurement that could not be taken
-would claim a standing this gate does not have.
+ask path at all. A rule that could not run is skipped, never turned into
+an ask - blocking a commit over a measurement that could not be taken
+would claim a standing this gate does not have. An unreadable diff or a
+rule that crashes is logged to `~/.jev-gates/hook-errors.log`. A failed
+`git grep`, `git ls-files` or `git log` call inside `seam-reality`,
+`test-layering` or `consequence-scoping` is skipped with no log line.
 
 ## The seven rules
 
@@ -53,11 +57,11 @@ would claim a standing this gate does not have.
 | --- | --- | --- | --- |
 | `depth` | Would deleting this new module just move its complexity elsewhere (shallow - a finding), or concentrate real complexity that is properly its own job (deep - good design, no finding) | Jev, one question per new file (up to 3) | no |
 | `seam-reality` | Does a newly introduced interface-shaped base class (`ABC`/`Protocol`/`Interface` in its bases) have two or more implementers in the repo, or only one/zero | Deterministic: `git grep` for subclasses | no |
-| `interface-test-surface` | Does a new/changed test import a private symbol directly, or use a leading-underscore identifier that might reach past the public interface | Deterministic for a private import; Jev for an ambiguous bare identifier | no |
+| `interface-test-surface` | Does a new/changed test import a private symbol directly, or use a leading-underscore identifier that might reach past the public interface | Deterministic for a private import, Jev for an ambiguous bare identifier | no |
 | `test-layering` | Does a new test file land at a module whose existing test file was left completely untouched | Deterministic: `git ls-files` plus a module-stem match | no |
 | `dependency-category` | Is a newly imported module stdlib, this repo's own `lib`/`skills` tree, or true-external | Deterministic: `sys.stdlib_module_names` plus a fixed local-root set | **yes** |
-| `health-delta` | Did this diff add more branch points (`if`/`elif`/`for`/`while`/`except`/`and`/`or`/`case`) than it removed, in a file that already existed | Deterministic: count on added vs. removed lines, gates the delta not the absolute count | no |
-| `consequence-scoping` | Has this file been touched in 15 or more of its last 200 commits | Deterministic: `git log --oneline -- <path>` | **yes** |
+| `health-delta` | Did this diff add 5 or more branch points (`if`/`elif`/`for`/`while`/`except`/`and`/`or`/`case`) than it removed, in a `.py` file that already existed | Deterministic: count on added vs. removed lines, gates the delta not the absolute count | no |
+| `consequence-scoping` | Have 15 or more commits touched this file (counting at most the 200 most recent that did) | Deterministic: `git log -200 --oneline -- <path>` | **yes** |
 
 `depth` and `interface-test-surface`'s ambiguous cases share **one** Jev
 request per commit (multiple questions, one call), the same
@@ -97,7 +101,7 @@ extra time," never "misses a real finding."
 
 `reference/PIPELINE-RESEARCH.md` specifies a three-level badge mapped to
 SARIF `level` and `rank`. The shared finding store (`lib/findings.py`) has
-no native `rank` field - four other gates already rely on its shape, and
+no native `rank` field - every other gate already relies on its shape, and
 widening it for one gate's badge was not worth the coupling. Gate 6
 approximates the badge as a `(level, confidence)` pair instead:
 
@@ -107,8 +111,8 @@ approximates the badge as a `(level, confidence)` pair instead:
 | worth-exploring | `note` | 0.6 |
 | speculative | `note` | 0.3 |
 
-Only a `strong` finding reaches `additionalContext` on the commit that
-just ran (non-blocking, same shape as Gate 4's `jev-risk-tier`). Every
+Only a `strong` finding reaches `additionalContext` on the commit about
+to run (non-blocking, same shape as Gate 4's `jev-risk-tier`). Every
 finding, whatever its badge, is written to the shared store - visible to
 Gate 7 later in the same session, per P2.
 
@@ -117,14 +121,14 @@ Gate 7 later in the same session, per P2.
 - **Not an AST-level analysis.** Every rule is a regex or line-count
   heuristic over diff text (plus, for two rules, a bounded `git
   log`/`git grep` call) - not a real parse of the changed code. False
-  negatives are expected; a rule that never fires on a given repo's shape
+  negatives are expected. A rule that never fires on a given repo's shape
   just stops being dispatched, which is the point of the measurement
   gate above.
 - **`dependency-category`'s local-root set starts from `{"lib", "skills"}`
   and extends itself with every `.py` file actually found in this
   repository's own `lib/` directory at run time** (this codebase imports
   its own shared modules by bare name - `import findings`, `import
-  jevgate` - never under a `lib.` prefix; a fixed `{"lib", "skills"}` set
+  jevgate` - never under a `lib.` prefix. A fixed `{"lib", "skills"}` set
   alone flagged every one of them as a supply-chain risk, independent
   review 2026-09-24, finding 5). A different project's own first-party
   layout would still need the base set widened if it does not keep shared
@@ -134,7 +138,7 @@ Gate 7 later in the same session, per P2.
   no declared base that several others happen to duck-type against).
 - **`health-delta`'s branch-keyword count is a proxy for complexity, not
   a real cyclomatic-complexity computation.** It counts keyword
-  occurrences on added/removed lines only; it does not parse the file.
+  occurrences on added/removed lines only. It does not parse the file.
 - **`test-layering`'s module-stem match is filename-based** (`test_x.py`/
   `x_test.py` -> `x`) and will miss a differently-named pair, or produce
   a false match for two unrelated modules that happen to share a stem.
@@ -160,9 +164,11 @@ rule's finding, never the commit or the other six rules).
 ## What it writes
 
 A JSONL decision line at `~/.jev-gates/gate6.jsonl` naming which rules
-fired and their badges, and one SARIF finding per fired rule in the
-shared store (`~/.jev-gates/findings`, `lib/findings.py`) - same store,
-same shape, every other gate already uses.
+fired and their badges, and one SARIF finding per result in the shared
+store (`~/.jev-gates/findings`, `lib/findings.py`) - same store, same
+shape, every other gate already uses. A rule can return more than one
+result. Nothing reaches the store when the hook input carries no
+session id.
 
 ## How to run it
 
@@ -190,7 +196,7 @@ python skills/code-quality/scripts/eval_gate6.py
 
 | Variable | Meaning |
 | --- | --- |
-| `GATE6_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. |
+| `GATE6_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. `install.py` sets it to `1` when absent and never overwrites a value you set. A plugin install through `hooks/hooks.json` sets nothing, so the gate stays off there. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. |
 | `GATE6_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate6.jsonl`. |
 | `GATE6_MEASURE_FILE` | Where the per-rule dispatch/finding counter lives. Defaults to `~/.jev-gates/gate6-measurement.json`. |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. Same store every other gate already uses. |
@@ -204,10 +210,9 @@ control (a trivial commit earns no findings), one case per deterministic
 rule confirming it fires on the shape it names, and one `depth` case that
 exercises a real Jev call without pinning its answer.
 
-Run through the project's mandatory adversarial review dispatch
-(Antigravity, per this project's standing rule) once the whole gate was
-built, per the operator's own `plo-handoff` cadence rule, "review only
-after a whole gate is fully built." The review returned 13 findings
+Put through an independent adversarial review once the whole gate was
+built (this project reviews a gate only after it is fully built). The
+review returned 13 findings
 (2 critical, 4 high, 5 medium, 2 low) - all fixed and individually
 re-verified against their own repro before this status was written:
 

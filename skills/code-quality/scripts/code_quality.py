@@ -657,8 +657,8 @@ def rule_consequence_scoping(fdiffs, cwd):
         if count >= HOTSPOT_COMMIT_THRESHOLD:
             out.append(Result(
                 "consequence-scoping", "strong",
-                f"{path!r} has {count}+ commits touching it in the last "
-                f"{HOTSPOT_LOG_WINDOW} - a repository hot spot, where a "
+                f"{path!r} has {count} commits touching it (counting at "
+                f"most {HOTSPOT_LOG_WINDOW}) - a repository hot spot, where a "
                 "mistake has a wider blast radius than its diff size "
                 "suggests.", path))
     return out
@@ -927,7 +927,7 @@ def emit(results):
         "hookEventName": "PreToolUse",
         "additionalContext": (
             f"Gate 6 flagged {len(strong)} strong code-quality finding(s) "
-            f"on the commit that just ran: {lines}. Not blocking - review "
+            f"on the commit about to run: {lines}. Not blocking - review "
             "when convenient."),
     }}))
     return 0
@@ -1361,4 +1361,11 @@ def selfcheck():
 if __name__ == "__main__":
     if "--selfcheck" in sys.argv:
         sys.exit(selfcheck())
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001  a measurement gate never blocks
+        try:
+            jevgate.hook_error(GATE, f"unhandled: {type(exc).__name__}: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+        sys.exit(0)

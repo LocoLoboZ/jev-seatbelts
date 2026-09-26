@@ -5,7 +5,49 @@ What changed, in plain words. Newest first.
 ## 2026-09-26
 
 The Windows update. If your agent lives in PowerShell, the seatbelt now
-clicks in there too.
+clicks in there too. One exception: the Gate 5 stall check still watches
+Bash only.
+
+### Later the same day
+
+A public content audit checked every doc against the code. These fixes
+came out of it.
+
+- **`install.py` switches the gates on, and now says so.** It sets
+  `GATEn_ENABLED` for Gates 1, 2, 3, 4, 6 and 7, plus
+  `GATE5_STALL_ENABLED`, `GATE7_SELFTUNE_ENABLED` and `DRIFTGUARD_ENABLED`,
+  to 1 when they are absent. It never overwrites a value you set. A plugin
+  install through `hooks/hooks.json` sets nothing, so every gate stays off
+  there. Neither route sets `GATE5_ENABLED`.
+- **The no-key warning covers Gate 3.** With no Jev key, Gate 3 is still
+  on and fails closed. A command its parser cannot resolve is denied.
+- **Gate 3 fails closed.** When Jev cannot answer, an unresolved command
+  is denied. Gate 3 asks only when it crashes inside itself.
+- **Gate 3 reads `cmd /c` through the Bash tool.** `cmd /c`, `cmd //c` and
+  `cmd /k` are treated as unreadable and sent to Jev. With no key, denied.
+- **Gates 1, 2 and 6 survive bad input.** An unhandled error, including
+  stdin that is not JSON, is logged. Gates 1 and 2 then ask. Gate 6 lets
+  the command through.
+- **Gates 2, 3 and 4 get 30 seconds.** Their hook timeout was 10 seconds,
+  shorter than a slow Jev call, so the harness could stop them before they
+  decided.
+- **`lib/gate_status.py` lists every switch.** It now shows
+  `GATE5_STALL_ENABLED` and `GATE7_SELFTUNE_ENABLED` too.
+- **Gate 7's thresholds were checked, not fitted.** 0.75 to block and 0.50
+  to warn were checked once against real labelled stops on 2026-09-26 and
+  kept. On held-out data the main blocking rule scored an AUROC of 0.50,
+  so the score cannot yet tell a right block from a wrong one.
+- **Push-time screening was never built.** It was decided in the design
+  and is written down as not built.
+- **The review chart is gone.** Its round counts were wrong: later rounds
+  found real defects, not zero. The README no longer claims the reviews
+  converged to zero.
+- **Every gate's docs now match its code.** All seven `SKILL.md` files,
+  their reference files, `SECURITY.md`, `CONTRIBUTING.md`, the design
+  notes, and the `hooks.json` and `plugin.json` descriptions were checked
+  line by line against the code and corrected. Stale code comments too.
+- **A local file path was removed from the design notes.** It named the
+  author's own user folder.
 
 ### New
 
@@ -18,12 +60,15 @@ clicks in there too.
 - **Gates 2, 4 and 6 check PowerShell commits and package installs.**
   Before this, an agent using PowerShell skipped them entirely.
 - **Gate 5 stall check.** Warns when the same test fails three times in a
-  row with edits in between. That's not debugging, that's pokies. Off
-  until `GATE5_STALL_ENABLED` is set.
+  row with edits in between. That's not debugging, that's pokies. It
+  watches test runs through the Bash tool only, not PowerShell.
+  `install.py` switches it on with `GATE5_STALL_ENABLED`. A plugin install
+  leaves it off until you set that variable.
 - **Gate 7 can tune itself from your replies.** It reads how you answered
   after each stop and moves a threshold only when the evidence is strong.
-  Off until `GATE7_SELFTUNE_ENABLED` is set. Your own `GATE7_BLOCK` and
-  `GATE7_WARN` always win.
+  `install.py` switches it on with `GATE7_SELFTUNE_ENABLED`. A plugin
+  install leaves it off until you set that variable. Your own
+  `GATE7_BLOCK` and `GATE7_WARN` always win.
 - **Gate 4 spots more keys.** TypeSafe, Anthropic and OpenAI project key
   shapes.
 
@@ -65,4 +110,5 @@ clicks in there too.
 
 ## 2026-09-24
 
-First public release. Seven gates, each off until you switch it on.
+First public release. Seven gates. `install.py` switched every gate on,
+overwriting any value already set. A plugin install left them all off.

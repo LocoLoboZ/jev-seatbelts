@@ -5,7 +5,8 @@ description: >
   after git add in the same shell invocation, `git commit -a`, and
   `git commit --amend`. Screens the staged diff for a hardcoded secret -
   an AWS access key, a GitHub/GitLab token, a Slack token, a Stripe live
-  key, a Google API key, an npm token, or a PEM private-key block - and
+  key, a Google API key, an npm token, a TypeSafe, Anthropic or OpenAI
+  project API key, or a PEM private-key block - and
   denies the commit outright if one appears on an ADDED line, no model
   call needed. When that fixed floor finds nothing and a Jev key is
   configured, one further Jev call judges what a fixed pattern cannot: a
@@ -27,26 +28,31 @@ secret/backdoor check and a risk-tier flag that recommends a slower
 two-axis (Standards, Spec) review, per `reference/DESIGN-BASIS.md`, "Gate
 4 absorbs the risk-sizing decision".
 
-It runs as a Claude Code `PreToolUse` hook on the `Bash` tool, the same
-matcher Gate 3 uses. It only ever has an opinion about a command that
-contains `git commit`; every other Bash command passes through untouched.
+It runs as a Claude Code `PreToolUse` hook on the `Bash` and `PowerShell`
+tools. A PowerShell command reaches it only when its text names `git` and
+then `commit`. It only has an opinion about a command that contains
+`git commit`, with one exception: a Bash command it cannot parse at all is
+asked about (rule `commit-unresolved`), because it cannot tell whether
+that command commits. Every other command passes through untouched.
 
 ## The three outcomes
 
 | Outcome | When | What the harness does |
 | --- | --- | --- |
-| **deny** | An added line matches a named secret shape (phase 1), or Jev judges a secret/backdoor present (phase 2, rule `jev-judged-secret`) | The commit does not run |
-| **ask** | The command is a commit, but the diff could not be read (not a repo, `git` missing, timeout) | The human is asked |
+| **deny** | An added line matches a named secret shape (phase 1), or Jev judges a secret/backdoor present (phase 2, rule `jev-judged-secret`) | The commit does not run. `python lib/bypass.py --grant` gives a one-time ticket that lifts a `jev-judged-secret` deny only (rule `gate-bypass-used`), never a phase 1 deny |
+| **ask** | The command cannot be parsed (`commit-unresolved`), the diff could not be read (`diff-unreadable`: not a repo, `git` missing, timeout), or the gate crashed (`internal-error`) | The human is asked |
 | **allow** | Not a commit, a commit whose diff has no match, or Jev cleared it (rule `jev-judged-clean`) | The gate stays silent |
 
 Allow is silent by design, same reasoning as Gate 3: an explicit `allow`
 decision would short-circuit the user's own permission rules and every
-other `PreToolUse` hook. **One exception**: a commit Jev flags as
-touching risk-sensitive ground (rule `jev-risk-tier`) is still allowed -
-the commit is local and reversible, so this never blocks it - but the
-flag is written to the shared finding store anyway, at SARIF `note`
-level, so a later gate or a human reading it can still see the
-recommendation. Without this one carve-out the flag would vanish with the
+other `PreToolUse` hook. **Two exceptions**: a commit Jev flags as
+touching risk-sensitive ground (rule `jev-risk-tier`), and a commit Jev
+could not judge in a session where Gate 3 already flagged a command (rule
+`gate3-caution-seen`). Both are still allowed - the commit is local and
+reversible, so this never blocks it - but the flag is printed to the
+agent as `additionalContext` and written to the shared finding store at
+SARIF `note` level, so a later gate or a human reading it can still see
+the recommendation. Without this carve-out the flag would vanish with the
 silent allow and nothing would ever route anywhere.
 
 ## Distinguishing a real Jev judgment from Jev being unreachable
@@ -55,7 +61,7 @@ An allow from Jev actually clearing a diff and an allow from Jev never
 being asked at all (no key, insufficient time budget, a failed or
 malformed call) render identically on stdout - allow is silent either
 way. The rule name in the decision log is the only way to tell them
-apart: `jev-judged-clean` means Jev was asked and said fine;
+apart. `jev-judged-clean` means Jev was asked and said fine.
 `resolved-safe` means Jev was never consulted, phase 1's own verdict
 stands unchanged. The same distinction Gate 3's `JUDGED_RULE` makes for
 its own Jev-judged tier, reproduced here for the identical reason -
@@ -86,8 +92,8 @@ parallel questions (no extra latency, per `reference/DESIGN-BASIS.md`'s
 own measurement) over the diff's added lines plus deterministic scope
 facts gathered with no API call - risk-category path hints detected from
 changed filenames only (auth, secrets, crypto, access control, billing,
-migration, deploy/infra, logging/monitoring - the same categories the
-operator's own CLAUDE.md names as risk paths), and the diff's size:
+migration, deploy/infra, logging/monitoring - the categories in
+`RISK_PATH_HINTS` in `commit_screening.py`), and the diff's size:
 
 - **Secret/backdoor question.** Does this diff still carry a credential or
   a backdoor a fixed pattern cannot phrase - an unusual auth bypass, a
@@ -102,15 +108,18 @@ operator's own CLAUDE.md names as risk paths), and the diff's size:
 
 Thresholds (`SECRET_THRESHOLD` = 0.6, `RISK_THRESHOLD` = 0.5 in
 `commit_screening.py`) are a reasoned starting point, **not yet
-calibrated** against this project's own logged outcomes - the same
-caveat Gate 3's `JEV_THRESHOLDS` carried before its own `jevcal`
-calibration run. Recalibrate the same way once `gatelog.py` has real
-verdicts to fit against.
+calibrated** against this project's own logged outcomes. Gate 3's
+`JEV_THRESHOLDS` carry the same caveat: they came from one Jev run on
+base rates and are not fitted to logged outcomes either. Recalibrate once
+`gatelog.py` has real verdicts to fit against.
 
 Fail policy, unchanged from what phase 1 already was: no key, not enough
-time budget to survive `call_jev`'s own worst case, or the call itself
-failing or coming back malformed - all fall back to the phase 1 verdict
-(rule `resolved-safe`), never a guess, never an ask. This is the fail-
+time budget to survive `call_jev`'s own worst case, the session's Jev
+call budget spent, or the call itself failing or coming back malformed -
+all fall back to the phase 1 verdict (rule `resolved-safe`), never a
+guess, never an ask. If Gate 3 flagged a command earlier in the same
+session, that fallback is `gate3-caution-seen` instead: still an allow,
+but flagged, as above. This is the fail-
 open-to-the-regex-scan behaviour `reference/DESIGN-BASIS.md` names for
 Gate 4 specifically: a commit is local and reversible, so an outage does
 not warrant blocking every commit while it lasts.
@@ -121,7 +130,9 @@ Only **added** lines (`+`, never a context or removed line) of the diff
 this commit is about to record:
 
 - Ordinary commit: `git diff --cached` - whatever is already staged.
-- `git commit -a`/`--am`/`-am`, or a `git commit` preceded by a `git add`
+  `git commit --am` is in this group: git reads `--am` as an
+  abbreviation of `--amend`, not as `-am`, so nothing extra is staged.
+- `git commit -a`/`--all`/`-am`, or a `git commit` preceded by a `git add`
   in the **same** shell invocation (`git add x && git commit -m y`):
   `git diff HEAD` for tracked files, plus a direct read of every
   currently untracked file, since `git diff` never shows an untracked
@@ -139,7 +150,8 @@ this commit is about to record:
 ## Known gaps, named rather than hidden
 
 - **No wrapper unwrapping.** Gate 3's `unwrap()` sees through `sudo`,
-  `env`, `timeout`, `bash -c`. This gate does not - `sudo git commit` or
+  `env` and `timeout`, and Gate 3 sends `bash -c` to Jev as code it cannot
+  read. This gate does neither - `sudo git commit` or
   `bash -c "git commit -m x"` is not detected. A residual gap, not a
   promise kept.
 - **`--amend` scans only the newly staged delta**, the same as an
@@ -164,8 +176,10 @@ A command this gate has already identified as a commit, but whose diff
 it then fails to read (not a git repo, `git` not on PATH, the read times
 out), answers **ask** - never silent allow. This gate has no read on
 what is about to be committed in that case, and gstack's rule (carried
-into Gate 3 already) is never allow by default on failure. A command
-that is not a commit at all is never touched, whatever else goes wrong.
+into Gate 3 already) is never allow by default on failure. A Bash
+command that cannot be parsed at all is asked about too (rule
+`commit-unresolved`), since the gate cannot tell whether it commits. A
+command that parses and is not a commit is never touched.
 
 This is phase 1's whole failure story, and phase 2's fail-open-to-this-
 scan behaviour named in `reference/DESIGN-BASIS.md` for when Jev itself
@@ -174,21 +188,23 @@ above.
 
 ## What it writes
 
-Every deny is recorded twice, same shape as Gate 3: a JSONL decision line
-at `~/.jev-gates/gate4.jsonl`, and a SARIF finding in the shared store so
-a later gate can see it. A `jev-risk-tier` allow is the one exception to
-"allow writes nothing" - it still writes a `note`-level finding, since
-that flag is the whole point of the risk-tier question and a silent
-allow would erase it.
+Every decision this gate makes writes a JSONL decision line at
+`~/.jev-gates/gate4.jsonl`, allows included. Every deny and every ask also
+writes a SARIF finding in the shared store so a later gate can see it,
+same shape as Gate 3, when the hook payload carries a session id. The
+`jev-risk-tier` and `gate3-caution-seen` allows are the exceptions to
+"an allow writes no finding" - each still writes a `note`-level finding,
+since the flag is the whole point and a silent allow would erase it.
 
 ## How to run it
 
 The hook is wired in `hooks/hooks.json` at the repository root. To check
-it by hand, from inside a real git repo with something staged:
+it by hand, from inside a real git repo with something staged, with the
+gate switched on for that one run:
 
 ```console
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"cwd":"'$(pwd)'"}' \
-    | python skills/commit-screening/scripts/commit_screening.py
+    | GATE4_ENABLED=1 python skills/commit-screening/scripts/commit_screening.py
 ```
 
 `--selfcheck` is fully offline - every assertion that could reach the
@@ -211,7 +227,7 @@ python skills/commit-screening/scripts/eval_gate4.py
 
 | Variable | Meaning |
 | --- | --- |
-| `GATE4_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. |
+| `GATE4_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. An install switch, not a rule toggle - see Gate 3's `SKILL.md` for why. `install.py` sets it to `1` when it is absent. A plugin install from `hooks/hooks.json` sets nothing. |
 | `GATE4_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate4.jsonl`. |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. Same store Gate 3 and Gate 7 already use. |
 | `GATE4_DEBUG` | Set to 1 to print tracebacks. The verdict is still ask. |
@@ -232,16 +248,20 @@ dispatching that review from the flag this gate writes is
 gate, not built here. This gate's job ends at "flagged, and the flag is
 recorded where a later gate or a human will see it."
 
-The eval is 9 cases, with a stored baseline at `evals/baseline/gate4.json`:
-8 offline and deterministic (unchanged from phase 1), plus one `judged`
-case added for phase 2 that makes a real Jev call on a machine with a key
-configured, checked by rule name so an unreachable Jev cannot masquerade
-as a real judgment and still pass (see "Distinguishing a real Jev
-judgment" above). It passes 9 of 9. Phase 1's own eval already caught one
-real bug its offline selfcheck missed: a chained `git add x && git
-commit` correctly widened its diff target, but the newly-added file was
-untracked, and `git diff` never shows an untracked file's content against
-any target - the fix is `_new_file_diff()`.
+The eval is 9 cases, with a stored baseline at `evals/baseline/gate4.json`.
+5 are settled with no Jev call: the four the fixed floor denies and the
+non-commit. The other 4 clear the floor, so on a machine with a key they
+make a real Jev call. Three of those expect allow. The fourth is the
+`judged` case added for phase 2, checked by rule name so an unreachable
+Jev cannot masquerade as a real judgment and still pass (see
+"Distinguishing a real Jev judgment" above). The stored baseline passed 9
+of 9 on 2026-09-22. It predates the one-time bypass, the read of Gate 3's
+earlier findings and the TypeSafe, Anthropic and OpenAI key shapes.
+Phase 1's own eval already caught one real bug its offline selfcheck
+missed: a chained `git add x && git commit` correctly widened its diff
+target, but the newly-added file was untracked, and `git diff` never
+shows an untracked file's content against any target - the fix is
+`_new_file_diff()`.
 
 ## References
 

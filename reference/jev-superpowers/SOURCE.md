@@ -12,7 +12,9 @@ Judged on observable properties of the artefact, not on its author:
   accounts, each granted shell, git-commit, or task-completion authority.
 - It was published 2 days before it was evaluated, with no track record.
 - Its own tool table pointed at `KSym04/limpet` as the completion gate. That
-  repository is an unrelated Rust project. A checkable broken reference.
+  repository is an unrelated Rust project. A checkable broken reference
+  at the time. As read on 2026-09-26, the upstream table has since been
+  corrected to `noplan-inc/limpet`.
 
 None of those points require an opinion about anyone. They are each
 verifiable by opening the repository.

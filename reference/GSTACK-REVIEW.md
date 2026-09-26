@@ -2,13 +2,14 @@
 
 `garrytan/gstack`, checked 2026-09-20. MIT, **133,729 stars**, 19,931 forks,
 created 2026-03-11, pushed 2026-09-18, 918 open issues, actively maintained.
-65 skills, 30 hook-related files, 1,236 test files.
+65 skills, 30 hook-related files, 1,236 test files. All counts in this
+file are as read on 2026-09-20 and have not been rechecked.
 
 This is a completely different trust profile from anything else this project
-has evaluated. `jev-superpowers` was 2 days old and rejected. `limpet` is 1
-star and was ported rather than installed. gstack is a mainstream,
-heavily-forked, well-tested project with a real test suite. The standing
-adoption rule is satisfied on every axis.
+has evaluated. `jev-superpowers` was 2 days old and rejected.
+`noplan-inc/limpet` had 1 star and was ported rather than installed.
+gstack is a mainstream, heavily-forked, well-tested project with a real
+test suite. The standing adoption rule is satisfied on every axis.
 
 Read directly: `careful/SKILL.md`, `guard/SKILL.md`,
 `careful/bin/check-careful.sh`, `hosts/claude/hooks/timeline-stop-hook.ts`,
@@ -23,7 +24,7 @@ industry-standard setup, and the safety gate does not call a model at all.
 
 Its Stop hook does not gate either. `timeline-stop-hook.ts` is telemetry
 repair with an explicit fail-open contract that always exits 0. gstack has no
-completion gate at all; quality comes from `/qa`, `/review` and `/ship`
+completion gate at all. Quality comes from `/qa`, `/review` and `/ship`
 skills the human invokes.
 
 For the stated intent - Jev on genuine decision gates only - this is the most
@@ -40,7 +41,7 @@ half carries almost all the weight, and hands us a tested pattern set.
 
 Three tiers, matching the allow/confirm/block shape we already settled on:
 
-- **HIGH, hard deny**: recursive delete of `/`, `~` or `$HOME`; force-push to
+- **HIGH, hard deny**: recursive delete of `/`, `~` or `$HOME`, and force-push to
   the repo's default branch. Only for SIMPLE commands - anything containing
   `;`, `&&`, `||`, `|` or a newline falls through to ask. Their stated rule
   is "conservative failure = ask, never guess".
@@ -80,7 +81,7 @@ decision. That is still sound, but gstack shows the cheaper first move:
 cannot answer the question.
 
 The `[NEVER_GATE]` concept is independent corroboration of our own hard rule
-that Gates 3 and 4 require Codex review regardless of what the cost logic
+that Gates 3 and 4 require independent review regardless of what the cost logic
 says. Two unrelated systems arrived at "some checks must not be optimised
 away".
 
@@ -113,7 +114,7 @@ Seven concrete items, ordered by how much they matter here.
 1. **Never allow-by-default on a parse failure.** Broken install, unreadable
    payload, missing helper - all return ask. Their comment is explicit: a
    hook that gates destructive commands must not allow-by-default. This is
-   the decision we already recorded for Gate 3; gstack proves it in
+   the decision we already recorded for Gate 3, and gstack proves it in
    production.
 
 2. **Parse `tool_input` with a real JSON parser.** They document the exact
@@ -127,14 +128,16 @@ Seven concrete items, ordered by how much they matter here.
    7 fails open silently and only logs when it survives far enough to reach
    the log call. If it dies parsing stdin, nothing is written anywhere and
    the gate is invisibly off. **This is a real gap in code we have already
-   shipped**, not a hypothetical.
+   shipped**, not a hypothetical. Fixed since: Gate 7 now logs any
+   unhandled error, including a stdin parse failure, to the hook error log.
 
 4. **Give the hook its own internal time budget.** Their Stop hook holds a
    2 s deadline, caps the file it will read at all, reads only a tail window,
    and re-checks the deadline before writing. They costed it explicitly
    because it runs on every Stop event machine-wide. Our Gate 7 has a tail
    window but no size cap and no internal deadline - it leans entirely on
-   Claude Code's outer 30 s timeout.
+   Claude Code's outer 30 s timeout. Fixed since: Gate 7 now holds its own
+   time budget and skips the Jev call when too little is left.
 
 5. **Project config may only ADD rules, never suppress.** `careful` reads
    extra patterns from a per-project file and consults them after the
@@ -144,7 +147,8 @@ Seven concrete items, ordered by how much they matter here.
 6. **Structured findings with a fingerprint.** Every specialist emits one
    JSON object per finding with severity, confidence, path, line, category
    and `fingerprint` (`path:line:category`) for deduplication. Gates 4, 5 and
-   6 all produce findings and currently have no agreed shape.
+   6 all produce findings and had no agreed shape when this was written.
+   They now share one: `lib/findings.py`, in SARIF 2.1.0.
 
 7. **Findings ship with the test that catches them.** Specialists include a
    `test_stub` in the detected framework. A finding that arrives with a
@@ -155,9 +159,9 @@ Seven concrete items, ordered by how much they matter here.
 
 - **Their Stop hook design.** It does not gate. Ours does, deliberately, and
   that is the differentiator over `ralph-loop`'s string match. Gate 7 stays.
-- **60 KB SKILL.md files.** `qa-only/SKILL.md` is 65 KB, `review/SKILL.md` is
-  61 KB. That is a prompt-heavy approach. Our gates stay small scripts with
-  short skills.
+- **60 KB SKILL.md files.** When read on 2026-09-20, `qa-only/SKILL.md` was
+  65 KB and `review/SKILL.md` was 61 KB. That is a prompt-heavy approach.
+  Our gates stay small scripts with short skills.
 - **Usage analytics.** Every skill appends to `~/.gstack/analytics/`. We log
   decisions for calibration, which is a different purpose. No usage
   telemetry.
@@ -171,9 +175,9 @@ Seven concrete items, ordered by how much they matter here.
 | --- | --- | --- |
 | 1 architecture pick | Jev Choice + confidence | Unchanged |
 | 2 package check | Registry lookup, Jev for typosquat only | Unchanged, already settled |
-| 3 command safety | Jev-first with a local prefilter | **Inverted.** Deterministic tiers do the work; Jev only for intent/command mismatch and the unmatched middle |
+| 3 command safety | Jev-first with a local prefilter | **Inverted.** Deterministic tiers do the work, Jev only for intent/command mismatch and the unmatched middle |
 | 4 commit screening | Jev secret scan + optional deep review | Add a Jev risk judgment to decide whether the deep review runs, replacing a line-count proxy |
-| 5 debug triage | Jev ranks hypotheses | Unchanged; add fingerprints and test stubs to findings |
+| 5 debug triage | Jev ranks hypotheses | Unchanged. Add fingerprints and test stubs to findings |
 | 6 code quality | Jev scores the diff | Gate on measured hit rates first, Jev second |
 | 7 completion check | Built, provisional | Keep. Add an error log and an internal time budget |
 

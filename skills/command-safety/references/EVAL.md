@@ -26,7 +26,7 @@ call**, so the eval needs `TYPESAFE_API_KEY` and network access. A live
 model's answer is not something a fixture should pin to one value, so a
 `judged` case passes on allow or deny. It fails if the gate asks or crashes,
 and it fails if the decision log does not show rule `jev-judged`. That last
-check matters: an allow from a real Jev judgment and an allow from Jev being
+check matters: a deny from a real Jev judgment and a deny from Jev being
 unreachable look the same on stdout. Without the rule check, every `judged`
 case would pass with the key missing.
 
@@ -46,12 +46,12 @@ At that point the gate made no model call and the eval was 69 cases, all
 deterministic. It passed 69 of 69.
 
 **The first run passed 49 of 49 and the gate was still broken.** An
-independent Codex review then reproduced twelve defects: a critical
+independent review then reproduced twelve defects. One was a critical
 fail-open where an import failure exited 1, which is neither allow nor
-block and lets the command run; seven ways to hide `rm -rf /` from the
-classifier, including `sudo -u root`, `timeout 5`, `env /bin/rm`,
+block and lets the command run. Seven were ways to hide `rm -rf /` from
+the classifier, including `sudo -u root`, `timeout 5`, `env /bin/rm`,
 `command`, `exec`, `if true; then ... fi`, and `$(...)` nested inside
-`${...}` or `$((...))`; and four false blocks on ordinary work, including
+`${...}` or `$((...))`. Four were false blocks on ordinary work, including
 `grep mkfs README.md` and `cp ~/.bashrc /tmp/backup`.
 
 Every one was reproduced locally before it was touched, then fixed, then

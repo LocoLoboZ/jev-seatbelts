@@ -33,8 +33,10 @@ GATES = [
     ("Gate 3", "command safety", "GATE3_ENABLED"),
     ("Gate 4", "commit screening", "GATE4_ENABLED"),
     ("Gate 5", "debug triage", "GATE5_ENABLED"),
+    ("Gate 5", "stall check", "GATE5_STALL_ENABLED"),
     ("Gate 6", "code quality", "GATE6_ENABLED"),
     ("Gate 7", "completion check", "GATE7_ENABLED"),
+    ("Gate 7", "self-tune", "GATE7_SELFTUNE_ENABLED"),
     ("P8", "drift guard", "DRIFTGUARD_ENABLED"),
 ]
 ON_VALUES = ("1", "true", "yes", "on")
@@ -95,6 +97,8 @@ _GATE_SOURCE_FILES = [
     "skills/commit-screening/scripts/commit_screening.py",
     "skills/completion-check/scripts/completion_check.py",
     "skills/debug-triage/scripts/hypothesis_ranker.py",
+    "skills/debug-triage/scripts/stall_check.py",
+    "skills/completion-check/scripts/gate7_selftune.py",
     "skills/code-quality/scripts/code_quality.py",
     "lib/driftcheck_hook.py",
 ]

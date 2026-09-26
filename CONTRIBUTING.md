@@ -8,10 +8,11 @@ including the author's own.
 
 jev-seatbelts: seven safety gates for a Claude Code development pipeline,
 built against the TypeSafe Jev API directly rather than by installing
-third-party binaries. All seven are implemented; Gate 7's threshold is
-still uncalibrated (see `README.md`, "Status"). The design reasoning,
-including the parts that turned out wrong, is kept in the project's
-private working notes rather than tidied away and forgotten.
+third-party binaries. All seven are implemented. Gate 7's thresholds were
+checked against real history and kept, but its score cannot yet tell a
+right block from a wrong one (see `README.md`, "Status"). The design
+reasoning, including the parts that turned out wrong, ships in
+`reference/DESIGN-BASIS.md` rather than being tidied away and forgotten.
 
 Read `README.md` for current status before filing anything. Several things
 that look like bugs are known and already written down.
@@ -57,17 +58,20 @@ the way it does.
    existence test against registry ground truth, and Gate 3 was inverted to
    run deterministic tiers first after a 133k-star project was found gating
    the same commands with zero model calls.
-2. **Thresholds are calibrated, not chosen.** Every confidence number in the
-   original design was copied from someone else's README. Any number shipped
-   here has to be fitted against real labelled examples and verified on a
-   held-out split.
+2. **Thresholds should be calibrated, not chosen.** Every confidence number
+   in the original design was copied from someone else's README. The aim is
+   that any number shipped here is fitted against real labelled examples
+   and verified on a held-out split. Not every number meets that yet. Gate
+   7's 0.75 and 0.50 are checked defaults, not fitted values, and the drift
+   check's 0.5 is not calibrated.
 3. **Failure behaviour is chosen per gate, never left to chance.** It is
-   written down in `reference/DESIGN-BASIS.md`. Gate 3 and any push fail
-   closed to a confirmation prompt, because those guard irreversible
-   actions. Gates 1, 5, 6 and 7 fail open and log, because none of them is
-   the last line of defence. Gate 7 as implemented does exactly that: with
-   no key, no rules, no transcript or no budget left, it records the failure
-   and allows the stop.
+   written down in `reference/DESIGN-BASIS.md`. Gate 3 fails closed: when
+   Jev cannot answer, a command it cannot resolve is denied, because it
+   guards irreversible actions. Push-time screening was meant to fail
+   closed too, but was never built. Gates 1, 5, 6 and 7 fail open, because
+   none of them is the last line of defence. Gate 7 with no key, no rules
+   or no transcript allows the stop without logging. When its time budget
+   runs out, or it crashes, it logs and allows the stop.
 4. **Evidence beats assertion.** A finding that arrives with a failing test
    is worth more than a paragraph explaining why something is wrong.
 

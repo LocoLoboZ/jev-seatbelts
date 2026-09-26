@@ -7,8 +7,8 @@ live in lib/evalharness.py.
 
 "test before trust": a gate is not done until you have watched it catch the
 bad cases AND leave the fine ones alone. Catching everything is not a pass,
-which is why four of the nine cases below are built to look like violations
-and must still be allowed.
+which is why six of the nine cases below must be allowed, several of them
+built to look like violations.
 """
 import os
 import subprocess

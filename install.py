@@ -41,13 +41,13 @@ PRETOOLUSE = [
         "skills/plan-gate/scripts/plan_gate.py", 30,
         "jev-seatbelts Gate 1: checking the plan")]},
     {"matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit", "hooks": [_hook(
-        "skills/command-safety/scripts/command_safety.py", 10,
+        "skills/command-safety/scripts/command_safety.py", 30,
         "jev-seatbelts Gate 3: checking the command")]},
     {"matcher": "Bash|PowerShell", "hooks": [_hook(
-        "skills/commit-screening/scripts/commit_screening.py", 10,
+        "skills/commit-screening/scripts/commit_screening.py", 30,
         "jev-seatbelts Gate 4: checking the commit")]},
     {"matcher": "Bash|PowerShell", "hooks": [_hook(
-        "skills/package-check/scripts/package_check.py", 10,
+        "skills/package-check/scripts/package_check.py", 30,
         "jev-seatbelts Gate 2: checking the package")]},
     {"matcher": "Bash|PowerShell", "hooks": [_hook(
         "skills/code-quality/scripts/code_quality.py", 30,
@@ -164,8 +164,10 @@ def install(dry_run=False):
     if not os.environ.get("TYPESAFE_API_KEY"):
         print("No TYPESAFE_API_KEY found in this shell's environment. Gate "
               "7 and the Jev-judged tiers of Gates 1, 2, 4 and 6 need one - "
-              "see README.md, \"Requirements\". Every other gate's fixed "
-              "floor still works with no key at all.")
+              "see README.md, \"Requirements\". Gate 3 is on and fails "
+              "closed without one: a command its parser cannot resolve is "
+              "denied, not asked. Every gate's fixed floor still works with "
+              "no key at all.")
     return 0
 
 

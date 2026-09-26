@@ -4,7 +4,7 @@
     python skills/plan-gate/scripts/eval_gate1.py
     python skills/plan-gate/scripts/eval_gate1.py --baseline
 
-The deterministic floor (D0-D9) is offline and model-independent - a
+The deterministic floor (D0-D7, D9) is offline and model-independent - a
 plan either trips a fixed rule or it does not, on any machine. The
 Jev-judged tier that runs after it is model-dependent, same caveat
 eval_gate2.py's own docstring gives: `expected="judged"` exists for a

@@ -37,7 +37,7 @@ under-fire rather than block on the agent's own words.
 
 This is also why the previous single threshold was misleading. "Stops at a
 bug without fixing it" scored exactly 0.75 against a 0.75 threshold in the
-baseline run. That rule is `[stated]`. Under this design it can no longer
+2026-09-20 baseline run. That rule is `[stated]`. Under this design it can no longer
 block at any score, so the borderline result stops being a coin flip about
 whether to halt the session.
 
@@ -139,22 +139,21 @@ the rule being satisfied the wrong way.
 ## Thresholds
 
 `DEFAULT_BLOCK` is **0.75** and `DEFAULT_WARN` is **0.50** in the script.
-Both are placeholders, not calibrated values, chosen to be conservative so
-the gate under-fires rather than nags.
+Both were checked once against real operator-labelled stops (2026-09-26)
+and kept. They are checked defaults, not fitted per-rule values. Held-out
+AUROC for the main blocking rule was 0.50, so the score cannot tell right
+blocks from wrong ones. See `CALIBRATION.md`.
 
-Per the standing project rule, no gate ships with a hardcoded confidence
-number that came from someone else's README. Before Gate 7 is considered
-finished, run the calibration described in `CALIBRATION.md` against this
-machine's own transcript history and replace these with per-rule values via
-`GATE7_BLOCK` and `GATE7_WARN`.
+Per-rule values come from the self-tune, which writes them to
+`~/.jev-gates/gate7-thresholds.json` only inside fixed guardrails.
+`GATE7_BLOCK` and `GATE7_WARN` override that file. They accept one number or
+a per-rule spec of the form `substring=0.8,other=0.6`, and a set value
+replaces every tuned value of that kind.
 
 Calibrate per rule, never one number for the gate. The rules measure
-different things and averaging across them destroys the finding. Both
-environment variables already accept a per-rule spec of the form
-`substring=0.8,other=0.6`.
+different things and averaging across them destroys the finding.
 
 Two numbers make the calibration measurable rather than assertable. Log
 every decision, then mark a row when an issue later surfaces that the gate
 should have caught. That gives an escape rate, target zero, and a
-false-block rate. Until those two numbers exist, a threshold change cannot
-be evaluated.
+false-block rate. Judge a threshold change against both.

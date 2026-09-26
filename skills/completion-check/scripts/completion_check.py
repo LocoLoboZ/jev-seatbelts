@@ -39,8 +39,8 @@ import jevgate  # noqa: E402
 GATE = 7
 HERE = os.path.dirname(os.path.abspath(__file__))
 RULES = os.path.join(HERE, os.pardir, "references", "rules.md")
-DEFAULT_BLOCK = 0.75  # provisional; replace with calibrated per-rule values
-DEFAULT_WARN = 0.50   # provisional; a warn is recorded, never blocks a stop
+DEFAULT_BLOCK = 0.75  # checked once on real labelled stops, 2026-09-26, kept
+DEFAULT_WARN = 0.50   # a warn is recorded, never blocks a stop
 LOG_DEFAULT = "~/.jev-gates/gate7.jsonl"
 
 # Off unless switched on deliberately. Claude Code has no per-hook enable

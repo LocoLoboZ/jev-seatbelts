@@ -22,12 +22,15 @@ plausible, see if the symptom goes away, move on without ever confirming
 *why* it went away. That produces fixes that mask a bug instead of
 resolving it, and repro-free "fixes" that silently regress later.
 
-Unlike Gates 3, 4, and 7, this is not a Claude Code hook. There is no
-single tool event to fire on for "a debugging session started" the way
-there is for a shell command, a commit, or a stop. This is a discipline
-the agent follows directly, with one script (`scripts/hypothesis_ranker.py`)
-called once, mid-way through, to remove a guess this gate can otherwise
-leave in - which hypothesis to test first.
+Unlike Gates 3, 4, and 7, the discipline itself is not a Claude Code
+hook. There is no single tool event to fire on for "a debugging session
+started" the way there is for a shell command, a commit, or a stop. This
+is a discipline the agent follows directly. One script
+(`scripts/hypothesis_ranker.py`) is called once, mid-way through, to
+remove a guess this gate can otherwise leave in - which hypothesis to
+test first. A second (`scripts/pattern_sizer.py`) helps size phase 4.
+One small hook, the stall check (`scripts/stall_check.py`), watches for
+the loop this gate exists to break - see "Status" below.
 
 ## The six phases (Matt Pocock's `diagnosing-bugs` discipline, unmodified)
 
@@ -96,7 +99,8 @@ every other unscripted phase here.
 Testing 3-5 ranked hypotheses "one variable at a time" does not mean one
 agent testing them one after another is always right. Before starting
 phase 4, invoke `agentic-orchestration-pattern-selector-dbs` to decide
-between two shapes:
+between two shapes. That selector is a separate, optional skill, not part
+of this repository. Without it, use the default below.
 
 - **Parent-only, sequential** (the default, and usually correct): test the
   top-ranked hypothesis, read the result, decide whether it confirms,
@@ -144,10 +148,16 @@ common case.
 
 ## Configuration
 
-Off until switched on, same install-switch convention as Gates 3, 4, and
-7: set `GATE5_ENABLED=1`. With it unset, `hypothesis_ranker.py` prints a
-one-line notice and exits 0 - rank hypotheses yourself, phase 3 is not
+Off until switched on: set `GATE5_ENABLED=1`. Unlike the hook gates,
+`install.py` does not set this one for you, so set it yourself. With it
+unset, `hypothesis_ranker.py` and `pattern_sizer.py` each print a
+one-line notice and exit 0 - rank hypotheses yourself, phase 3 is not
 blocked by the gate being off, only unassisted.
+
+The stall check has its own switch, `GATE5_STALL_ENABLED`. `install.py`
+sets it to `1` when it is absent and never overwrites a value you set. A
+plugin install through `hooks/hooks.json` sets nothing, so the stall
+check stays off there until you set it.
 
 The key is read from `TYPESAFE_API_KEY`
 (same lookup every other gate uses, see `lib/jevgate.py`). With no
@@ -181,18 +191,18 @@ promoted as the baseline at `evals/baseline/gate5.json`.
 fallback coverage), and live-fire tested against two real cases - a
 same-file, same-test scenario correctly stayed parent-only (7%), a
 genuinely isolated three-service concurrency scenario correctly selected
-parallel (68%). This is the concrete script behind `SKILL.md`'s "Optional
-Jev-assisted topology check" section in the selector skill itself
-(`~/.claude/skills/agentic-orchestration-pattern-selector-dbs/SKILL.md`),
-added this session - opt-in only, every other caller of that skill is
-unaffected, and it falls back to the selector's own unassisted decision
-table on any failure.
+parallel (68%). This is the concrete script behind the "Optional
+Jev-assisted topology check" section of the separate selector skill named
+above, which is not part of this repository. It is opt-in only, every
+other caller of that skill is unaffected, and it falls back to the
+selector's own unassisted decision table on any failure.
 
-**No hook wiring, and none is planned.** Unlike Gates 3, 4, and 7, this
-gate has no entry in `hooks/hooks.json` - there is no tool event that
-means "a debugging session began" to fire a `PreToolUse` or `Stop` hook
-on. It is discovered and followed as a skill, per the trigger description
-above, the same way `superpowers:systematic-debugging` already is.
+**No hook for the discipline itself.** Unlike Gates 3, 4, and 7, the
+ranking and sizing scripts have no entry in `hooks/hooks.json` - there is
+no tool event that means "a debugging session began" to fire a
+`PreToolUse` or `Stop` hook on. It is discovered and followed as a
+skill, per the trigger description above, the same way
+`superpowers:systematic-debugging` already is.
 
 **One hook after all: the stall check (2026-09-26).** There is still no
 event for "a debugging session began", but there is one for its most
@@ -201,7 +211,8 @@ on `PostToolUse` for Bash and edit tools, fingerprints each failing
 test-like run (last 40 lines, digits and hex masked), and when the same
 fingerprint returns three times with an edit in between it tells the
 agent, via `additionalContext`, to stop guessing and come back here. No
-model call, never blocks, off until `GATE5_STALL_ENABLED=1`. Idea from
+model call, never blocks, off until `GATE5_STALL_ENABLED=1` (which
+`install.py` sets, see "Configuration" above). Idea from
 `awlevin/typesafe-computer-use` (MIT), see
 `reference/PIPELINE-RESEARCH.md`. Self-check:
 `python skills/debug-triage/scripts/stall_check.py --selfcheck`.
@@ -229,7 +240,7 @@ hand-constructed to already match the eval's known answer.
 
 ## References
 
-- `reference/DESIGN-BASIS.md`, "Gate 5 — debug triage (biggest upgrade
+- `reference/DESIGN-BASIS.md`, "Gate 5 - debug triage (biggest upgrade
   available)" - why Jev is scoped to phase 3 only, and not the rest of the
   discipline.
 - `lib/jevgate.py` - the shared Jev client, budget/headroom discipline,

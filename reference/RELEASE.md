@@ -29,7 +29,7 @@ files in a later commit did not remove either of them.
    machine this was built on. Untracking them in `dc233a8` left the blobs in
    place.
 
-Both were found by an independent Codex review on 2026-09-20. Neither is
+Both were found by an independent review on 2026-09-20. Neither is
 fixable by editing the current tree.
 
 ## Procedure
@@ -64,7 +64,8 @@ Also confirm by hand:
 - `git ls-files` contains `LICENSE`, `README.md`, `CONTRIBUTING.md` and
   `SECURITY.md`, and contains no file under `reference/jev-superpowers/`
   other than `SOURCE.md`.
-- The three offline checks in `README.md` still pass in the new directory.
+- The offline checks listed in `README.md` still pass in the new
+  directory.
 - Commit author and email are what you want on a public repository.
 
 Dry run of this procedure on 2026-09-20 against `11c9326` produced one
@@ -80,20 +81,17 @@ commit, 36 objects, and no hits on any of the checks above.
 
 ## Before any of this
 
-The repository is not ready to publish while these are open.
+Do these before every release.
 
-- Gate 7's threshold is uncalibrated. Run the calibration procedure in
-  `skills/completion-check/references/CALIBRATION.md` first.
 - Re-run an independent adversarial review against the exact commit being
   released, not against a moving working tree.
-- `reference/DESIGN-BASIS.md` ships publicly: 28 other files cite specific
-  sections of it as their rationale, so excluding it would leave 28 dangling
+- `reference/DESIGN-BASIS.md` ships publicly: 30 other files cite specific
+  sections of it as their rationale, so excluding it would leave 30 dangling
   references. Instead it has been scrubbed of the machine-specific paths
   and one personal environment-variable name it used to carry - confirm no
-  new personal detail has crept back in since, with the same grep used
-  during the "Check for a personal machine path" step below extended to
-  personal usernames, machine paths, or private environment-variable
-  prefixes as well.
+  new personal detail has crept back in since. Use the user-path grep in
+  "Checks before pushing the baseline" above, extended to personal
+  usernames, machine paths and private environment-variable prefixes.
 
 ## Updating the public repository later
 

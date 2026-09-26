@@ -79,13 +79,16 @@ this skill's script.
 
 | Variable | Meaning |
 | --- | --- |
-| `GATE7_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. Anything else, including a typo, leaves it off. |
+| `GATE7_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. Anything else, including a typo, leaves it off. `install.py` sets it to `1` when it is absent. A plugin install through `hooks/hooks.json` sets nothing. |
+| `GATE7_SELFTUNE_ENABLED` | Switches on the daily self-tune run (see `references/CALIBRATION.md`). Same values and same install behaviour as `GATE7_ENABLED`. |
 | `TYPESAFE_API_KEY` | The Jev key. Also read from the Windows user registry when it is not in the environment, because a hook does not always inherit user variables. |
-| `GATE7_BLOCK` | One number for every rule, or `substring=0.62,other=0.71` per rule. Only `[observed]` rules can reach it. |
-| `GATE7_WARN` | Same format. A warn is recorded and printed, and never blocks. |
+| `GATE7_BLOCK` | One number for every rule, or `substring=0.62,other=0.71` per rule. Only `[observed]` rules can reach it. When set, it replaces every self-tuned block value, not only the rules it names. A rule it does not name falls back to 0.75. |
+| `GATE7_WARN` | Same format and same override. A warn is recorded and printed, and never blocks. |
+| `GATE7_TUNED` | The self-tuned threshold file. Defaults to `~/.jev-gates/gate7-thresholds.json`. |
+| `GATE7_EXTRA_TEST` | Extra regular expressions, one per line, for commands this project counts as a test run. Additive only. |
 | `GATE7_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate7.jsonl`. |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. |
-| `GATE7_DEBUG` | Set to 1 to print tracebacks instead of failing silently. |
+| `GATE7_DEBUG` | Any non-empty value prints the traceback of an unhandled error. The error is written to the hook error log either way. |
 
 ### Switching the gate on
 
@@ -93,6 +96,8 @@ Gate 7 is off until `GATE7_ENABLED` is set, and off means it returns before
 it reads its own input. Registering the hook is not enough, because Claude
 Code has no per-hook enable mechanism: a hook listed in `hooks.json` fires on
 every Stop. The switch therefore has to live inside the script, and it does.
+`install.py` sets the variable for you. A plugin install does not, so set it
+by hand:
 
 ```console
 setx GATE7_ENABLED 1      # Windows, new shells only
@@ -116,9 +121,8 @@ prose, because another gate wrote them from tool output before this turn
 ended, so a rule scored over them may block. At most 25 are included, newest
 first, so a long session's backlog cannot eat the gate's time budget.
 
-No gate writes to the store yet, so this is live plumbing with nothing
-upstream of it. It is built first on purpose: retrofitting six gates later
-costs more than building the store now.
+Gates 3, 4 and 6, the debug-triage ranker and the bypass log write to the
+store, so a finding any of them recorded this session reaches Gate 7.
 
 ## Failure behaviour: fail open, deliberately
 
@@ -133,25 +137,27 @@ There is also a loop guard: Claude Code sets `stop_hook_active` after a
 push-back, and the gate exits 0 immediately when it sees it. It can push back
 once per stop chain and can never trap a session in a loop.
 
-## Status: provisional, not finished
+## Status: checked defaults
 
-The 0.75 block and 0.50 warn thresholds are placeholders, not calibrated
-values. Per the standing project rule, no gate ships with a borrowed
-confidence number. `references/CALIBRATION.md` holds the procedure that
-replaces them, and that procedure **has not been run yet**. Calibrate per
-rule, never one number for the gate, because the rules measure different
-things and an average across them destroys the finding.
+The 0.75 block and 0.50 warn thresholds were checked once against real
+operator-labelled stops (2026-09-26) and kept. They are checked defaults,
+not fitted per-rule values. Held-out AUROC for the main blocking rule was
+0.50, so the score cannot tell right blocks from wrong ones. The run is
+recorded in `references/CALIBRATION.md`. The self-tune can move a rule's
+value later, but only inside fixed guardrails. Calibrate per rule, never one
+number for the gate, because the rules measure different things and an
+average across them destroys the finding.
 
 The evaluation described in `references/EVAL.md` has been run and is
-recorded there, with a stored baseline at `evals/baseline/gate7.json`. One
-case, "stops at a bug without fixing it", passed by 0.00, sitting exactly on
-the threshold. That rule is `[stated]`, so under the current design it can
-no longer block at any score, and the borderline result is no longer a coin
-flip about halting a session. It is still an uncalibrated number.
+recorded there, with a stored baseline at `evals/baseline/gate7.json`
+(2026-09-22, 9 of 9). The case "stops at a bug without fixing it" is scored
+by a `[stated]` rule, which can never block, so the eval now expects it to
+be allowed. It scored 0.73 in the baseline.
 
-What is missing before a threshold change can be judged at all: a marked
-decision log giving an escape rate, meaning issues the gate should have
-caught, target zero, and a false-block rate. Neither exists yet.
+Escape rate, meaning issues the gate should have caught, target zero, and
+false-block rate come from marked decisions. Mark them with
+`python lib/gatelog.py --mark` and read them with `--rates`. The self-tune
+adds automatic labels from the human's next reply.
 
 ## References
 

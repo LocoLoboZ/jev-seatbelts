@@ -1,9 +1,12 @@
 # Calibrating Gate 7's thresholds
 
 Standing project rule: no gate ships with a confidence number copied from
-someone else's README. The 0.75 in the script is a placeholder chosen to
-under-fire. This page is the procedure that replaces it with numbers fitted
-to this machine's own history.
+someone else's README. The 0.75 block and 0.50 warn defaults were checked
+once against real operator-labelled stops (2026-09-26) and kept. They are
+checked defaults, not fitted per-rule values. Held-out AUROC for the main
+blocking rule was 0.50, so the score cannot tell right blocks from wrong
+ones. This page is the procedure for fitting per-rule numbers to this
+machine's own history, and the record of that check.
 
 Method adapted from `noplan-inc/limpet`'s `calibrate` subcommand, read
 directly. See `PROVENANCE.md`.
@@ -26,7 +29,8 @@ stops from bad ones at all.
 2. **Label each stop, without letting the labeller see the rules.** Ask Jev
    one Choice question: how did the human react? Options: `push` (told the
    agent to do what it should already have done), `correction` (pointed out
-   a mistake), `question`, `new_request`, `ack`.
+   a mistake), `question`, `new_request`, `ack`. The self-tune now uses a
+   different option set, see "Self-tuning" below.
 
    Put the human's reply inside the **question**, never in the shared state.
    Rule questions asked over the same state must not be able to see the
@@ -36,12 +40,14 @@ stops from bad ones at all.
    hook would build, including the hard evidence fields.
 
 4. **Split.** `bad` = reaction was `push` or `correction`. `good` =
-   everything else.
+   everything else. In the self-tune, an allowed stop is `bad` when the
+   reply was `premature` or `false_claim`. Blocked stops are labelled as
+   described below.
 
 5. **Per rule, compute:**
-   - **AUROC** over (bad scores, good scores). Below about 0.55 the rule does
-     not separate anything. Do not ship it with a threshold; leave it in
-     shadow mode and reword it.
+   - **AUROC** over (bad scores, good scores). Below 0.60, the floor the
+     self-tune enforces, treat the rule as not separating anything. Do not
+     ship it with a threshold. Leave it in shadow mode and reword it.
    - **Threshold** = the score at the 95th percentile of `good`, so roughly
      5% of fine stops are blocked. Tighten `--fp` if that is still too noisy.
    - **Catch rate** = share of `bad` stops at or above that threshold. This
@@ -51,19 +57,21 @@ stops from bad ones at all.
    A threshold fitted and reported on the same data is a number about that
    data, not about future stops.
 
-7. **Write the result** into `GATE7_BLOCK` as
-   `substring=0.62,other substring=0.71`. The substring must be a unique
-   prefix of the rule text.
+7. **Write the result** into `~/.jev-gates/gate7-thresholds.json`. The
+   self-tune does this for you. Setting `GATE7_BLOCK` as
+   `substring=0.62,other substring=0.71` instead overrides every tuned
+   value. A key matches any rule whose text contains it and the first match
+   wins, so make each key unique to one rule.
 
 ## Two tiers, and which rules get which
 
 Since the evidence-class change, a rule is either `[observed]` or `[stated]`
 (see `rules.md`). Fit them differently, because they can do different things.
 
-- An `[observed]` rule can block. Fit `GATE7_BLOCK` for it by the procedure
-  above, at the 95th percentile of `good`.
+- An `[observed]` rule can block. Fit a block threshold for it by the
+  procedure above, at the 95th percentile of `good`.
 - A `[stated]` rule can only warn. Fitting a block threshold for it is
-  meaningless. Fit `GATE7_WARN` instead, and there is no need to be
+  meaningless. Fit a warn threshold instead, and there is no need to be
   conservative, because a warn costs a log line and never halts anything.
   A looser warn threshold buys more signal for the feedback loop.
 
@@ -113,8 +121,12 @@ proved too coarse on a 41-stop trial: "push" also caught ordinary
 go-aheads such as "fix all review items as recommended", so half the
 "miss" labels were wrong. Jev is now asked whether the human's reply says
 the stop was premature or a claim was false, which is the one thing this
-gate is for. Jev reads the human's reply, not the agent's claim, so this
-is the operator labelling the gate, not the gate grading itself.
+gate is for. The agent's last message is passed too, marked untrusted and
+as context only. The label is the human's reaction, not a judgement of the
+agent's claim, so this is the operator labelling the gate, not the gate
+grading itself. Labelling is a separate call from rule scoring, which
+reuses the scores the live hook logged, so the reply cannot leak into a
+score.
 
 Blocked stops, which have no human reply of their own, are labelled from
 what followed: the block led to a new test run (right), or the agent did
@@ -122,24 +134,29 @@ nothing after it and the human carried on calmly (wrong). A human verdict
 from `gatelog.py --mark` always overrides an auto label.
 
 It runs once a day from SessionStart, in the background, when
-`GATE7_SELFTUNE_ENABLED` is set. A threshold moves only when a rule has
+`GATE7_SELFTUNE_ENABLED` is set. `install.py` sets it. A plugin install
+through `hooks/hooks.json` does not. A threshold moves only when a rule has
 enough labelled data on a 70/30 split, held-out AUROC is at least 0.60,
 the held-out error does not get worse, the step is at most 0.05, and the
 value stays inside 0.55-0.95 (block) or 0.30-0.90 (warn). Values are
 written to `~/.jev-gates/gate7-thresholds.json`, every change is logged to
-`~/.jev-gates/gate7-tuning.jsonl`, `--reset` sets them aside, and an
-operator's `GATE7_BLOCK`/`GATE7_WARN` always wins.
+`~/.jev-gates/gate7-tuning.jsonl`, and `--reset` sets them aside. A set
+`GATE7_BLOCK` or `GATE7_WARN` replaces every tuned value of that kind, not
+only the rules it names.
 
-First full run, 2026-09-26: 262 labelled decisions (237 fine stops, 4
-misses, 14 right blocks, 7 wrong blocks). No threshold moved, correctly:
+First full run, 2026-09-26. At the time of the run there were 262 labelled
+decisions (237 fine stops, 4 misses, 14 right blocks, 7 wrong blocks). The
+label store has grown since, so these figures will not reproduce exactly.
+No threshold moved, correctly:
 
 - Right and wrong blocks score the same (0.75-0.85 against 0.75-0.89), so
   raising the block threshold drops good blocks as often as bad ones.
   Held-out AUROC for the test-claim rule was 0.50.
-- The 4 misses scored 0.34-0.61. Blocking at 0.60 would catch three and
-  also stop about 30 fine turns.
+- The 4 misses scored 0.34-0.61 at the time. Blocking at 0.60 would have
+  caught three and also stopped about 30 fine turns.
 
-So 0.75 is about right for what the score can separate. The wrong blocks
+So 0.75 was kept as a checked default. It is not a fitted value, and with
+held-out AUROC at 0.50 the score cannot tell right blocks from wrong ones. The wrong blocks
 are an evidence problem, not a threshold problem. One cause was found and
 fixed the same day: test runs made through the PowerShell tool were not
 counted as test runs, so a turn that ran the whole suite was blocked as
@@ -148,9 +165,7 @@ counted as test runs, so a turn that ran the whole suite was blocked as
 ## Status before self-tuning
 
 The fitting mechanism (`jevcal_calibrate_gate7.py`) is built and has been run
-live against this machine's real gatelog verdicts. As of 2026-09-23 there are
-only 5 real verdicts, below the 20-sample trust floor, so the script
-correctly reports its own output as NOT TRUSTWORTHY. No threshold has moved.
-The gate still operates on the placeholder 0.75 and should be treated as
-provisional until more verdicts are marked (`python lib/gatelog.py --mark`)
-and the script is re-run.
+live against this machine's real gatelog verdicts. As of 2026-09-23 there
+were only 5 real verdicts, below the 20-sample trust floor, so the script
+correctly reported its own output as NOT TRUSTWORTHY and no threshold moved.
+The self-tune run of 2026-09-26 above superseded that state.

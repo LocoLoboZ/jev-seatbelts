@@ -41,7 +41,9 @@ was copied verbatim.
   runs `subprocess.run(cmd, shell=True)` on a config-supplied string, which
   is a shell-execution surface we have no need to carry.
 
-Result: roughly 605 lines becomes roughly 300, with no feature we use lost.
+Result at the time of the port: roughly 605 lines became roughly 300, with
+no feature we use lost. The script has grown well past that since, and its
+generic plumbing now lives in the shared `lib/jevgate.py`.
 
 ## What our implementation adds
 
@@ -114,7 +116,7 @@ Removing them would leave Gate 7 permanently stuck on a guessed threshold,
 which is the specific weakness this gate is being built to remove. The file
 holds the operator's own conversation on their own machine and is a strict
 subset of what `~/.claude/projects` already stores unencrypted. Tightening
-the mode addresses the exposure; deleting the data would trade a real
+the mode addresses the exposure. Deleting the data would trade a real
 capability for no meaningful gain.
 
 ## Second automated security review (2026-09-20)
@@ -136,7 +138,7 @@ body is not echoed either. The realistic leak risk was low.
 **Done anyway, narrowly.** `jevgate.redact()` strips the live key value by
 direct comparison, plus `Bearer <token>`, `sk-`/`tsk-`/`key-` prefixed
 tokens, and any 40+ character token-shaped run. Applied to every write to the
-error log. Diagnostics survive; secrets do not.
+error log. Diagnostics survive. Secrets do not.
 
 Two bugs surfaced while proving it, both caught by the assertion rather than
 by review:

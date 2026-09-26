@@ -510,8 +510,9 @@ def _worst(verdicts):
 # human step. See reference/DESIGN-BASIS.md, "Gate 3 reframed", for the
 # sources (pi-verdict, jev-axi, pr-sieve, jev-belay, jev-engineering) and
 # the one place they disagree (fail-open vs fail-closed on the judge call
-# itself), which this project resolves by operator decision: fail open here,
-# because the fixed floor is where fail-closed belongs, not this tier.
+# itself). This project first chose fail open here, then changed to fail
+# closed: when Jev cannot answer, a command this tier cannot resolve is
+# denied (see decide() and the fail-CLOSED selfcheck block).
 # Claude Code's PreToolUse hook cap is assumed ~30s, the same figure Gate 7
 # carries for Stop (see reference/GSTACK-REVIEW.md) - not independently
 # confirmed for PreToolUse specifically. HOOK_BUDGET_MS is the overall
@@ -1339,6 +1340,12 @@ def analyse(segments, command):
             reason = reason or f"`{verb}` runs a body this gate cannot read"
         elif verb in INTERPRETERS and gives_code(verb, args):
             reason = reason or f"`{verb}` is given code on the command line"
+        elif verb == "cmd" and any(
+                a.text.lower().lstrip("/")[:1] in ("c", "k")
+                and a.text.startswith("/") for a in args):
+            # Git Bash runs cmd.exe too, and `cmd //c` is its usual form.
+            # Found in public content audit, 2026-09-26 (RR-8).
+            reason = reason or "`cmd` is given a command line this gate cannot read"
         elif verb in FEEDERS:
             reason = reason or f"`{verb}` takes the real command from its input"
         elif verb == "find" and any(
@@ -1840,6 +1847,8 @@ def selfcheck():
                     "node -e 'process.exit(1)'", "perl -pe 's/a/b/' f",
                     "pwsh -e ZQBjAGgAbwA=", "powershell -enc ZQBjAGgAbwA=",
                     "pwsh.exe -e ZQBjAGgAbwA=", "bash.exe -c 'rm -rf /tmp/x'",
+                    "cmd /c del x", "CMD /C del x", "cmd //c del x",
+                    "cmd.exe /k del x",
                     "rm -rf $BUILD_DIR", "rm -rf build/*",
                     "echo $UNSET_THING", "cd $HOME && ls",
                     "git commit -m \"$MSG\"", "rm -rf /tmp/scratch",

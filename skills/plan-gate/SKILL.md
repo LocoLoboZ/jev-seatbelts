@@ -4,7 +4,7 @@ description: >
   Gate 1. Runs before ExitPlanMode - the one point in a session where a
   whole plan exists as text before any file is touched. A one-line fix
   or a named-symptom repair passes with no model call at all. Any other
-  plan runs ten deterministic checks (unresolved markers, placeholders,
+  plan runs eight deterministic checks (unresolved markers, placeholders,
   unquantified claims, at least one falsifiable outcome, named artefacts
   actually resolving, at least one proof command, MUST lines addressed,
   override completeness) and then exactly one Jev call judging goal
@@ -42,14 +42,15 @@ unfalsifiable."
 | Outcome | When |
 | --- | --- |
 | **go** (silent allow) | Trivial work class, or a feature-class plan that clears every deterministic check and every Jev field |
-| **needs-clarification** (ask) | A soft deterministic signal (vague adjective, no proof command, an unaddressed MUST) or a soft Jev field (oversized, low stack confidence, an unfalsifiable criterion) |
+| **needs-clarification** (ask) | A soft deterministic signal (vague adjective, no proof command, an unaddressed MUST) or a soft Jev field (oversized, low stack confidence, an unfalsifiable criterion). Also any plan the gate cannot judge: empty, over 6000 characters, a missing or non-string `plan` field, a check that failed, or an internal error |
 | **block** (deny) | A hard deterministic failure (unresolved markers, a placeholder, no falsifiable outcome, a named artefact that does not exist, an incomplete override) or a hard Jev field (goal mismatch, a real contradiction) |
 
 ## D0: work-class triage, the cheap path
 
-A plan phrased as fixing one named symptom (bug, typo, error, crash,
-regression) touching at most one file, with no new dependency mentioned,
-returns **go** immediately. Nothing below this runs, including the Jev
+A plan phrased as a one-line fix, or as fixing, repairing or patching
+one named symptom (bug, typo, error, crash, regression, symptom,
+exception, traceback), that names at most one file and mentions no new
+dependency, returns **go** immediately. Nothing below this runs, including the Jev
 call. Deliberately conservative: classification only fires on a clear
 match, because misclassifying a real feature as trivial is worse than
 occasionally sending a genuinely trivial plan through the full path.
@@ -64,14 +65,14 @@ occasionally sending a genuinely trivial plan through the full path.
 | D4 | Zero falsifiable outcomes anywhere - no numeral-with-unit and no named observable artefact | block |
 | D5 | A path the plan says it will edit does not exist, or a named package is not in this project's manifest | block |
 | D6 | No named command or test file that would prove the change | ask |
-| D7 | A MUST line from a declared principles file is not addressed by name | ask (no-op today - see "Known gaps") |
+| D7 | A MUST line from a declared principles file is not addressed by name | ask (only when a principles file exists - see "Known gaps") |
 | D8 | The prior gate's record exists and its schema version matches | not built - Gate 1 is first in the pipeline, so there is no prior plan-stage record to check |
 | D9 | An asserted override is missing `Violation:`, `Why needed:`, or `Simpler alternative rejected because:` | block |
 
-D1/D2/D4/D5/D9 run first, in that order, and the first hit stops the
-gate outright with no Jev call - a hard failure needs no judgment. D3/D6/D7
-run afterwards and are only ever collected as soft flags; they never
-block alone.
+D1, D2, D4 and D9 run first, in that order, then D5. The first hit
+stops the gate outright with no Jev call - a hard failure needs no
+judgment. D3, D6 and D7 run afterwards and are only ever collected as
+soft flags. They never block alone.
 
 **D5 stays deterministic permanently.** Per PIPELINE-RESEARCH.md: it is
 "exactly the fact lookup Jev was tested on and failed" - the same
@@ -102,13 +103,12 @@ if a soft one fired), never a guessed block.
 
 ## Known gaps, named rather than hidden
 
-- **D7 is a no-op in this repository today.** No `PRINCIPLES.md` (or
-  `GATE1_PRINCIPLES_FILE`) exists yet - P12's built resolution reused the
-  shared finding store instead of a declared principles file (see
-  `reference/DESIGN-BASIS.md`, "P12 built"). The check is real
-  infrastructure, not a promise this repository currently keeps.
-- **D8 is not built at all.** Gate 1 is first in the pipeline; there is
-  no prior plan-stage record for it to check. Named for whoever adds a
+- **D7 only runs when a principles file exists.** It reads MUST lines
+  from `PRINCIPLES.md` in the plan's working directory, or from the file
+  `GATE1_PRINCIPLES_FILE` names. In a project with neither, D7 does
+  nothing.
+- **D8 is not built at all.** Gate 1 is first in the pipeline, so there
+  is no prior plan-stage record for it to check. Named for whoever adds a
   second plan-stage gate later.
 - **D0's trivial/feature split is a text heuristic**, not a real
   work-item classifier. A plan that phrases a real feature using
@@ -130,21 +130,29 @@ if a soft one fired), never a guessed block.
   Jev tier at all** - it asks for clarification instead of judging a
   truncated view of it (fixed after adversarial review found the
   original silently truncated and judged only the head). No chunking or
-  multi-call summarisation is attempted; a plan that large is asked to
+  multi-call summarisation is attempted. A plan that large is asked to
   be split or shortened, not partially judged.
 
 ## The exit-code contract
 
 Unchanged from every other gate here: exit 1 from a `PreToolUse` hook is
-**neither allow nor block**, so the plan goes through unexamined. Every
-path here reaches a deliberate 0 or an explicit JSON decision, including
-a failure to import this gate's own dependencies.
+**neither allow nor block**, so the plan goes through unexamined. So
+every path here ends in exit 0, with or without a JSON decision. A
+failure to import this gate's own dependencies answers ask. Any other
+unhandled error, including stdin that is not JSON, is written to
+`~/.jev-gates/hook-errors.log` and answered ask with rule
+`internal-error`.
+
+The hook timeout is 30 seconds. Inside it the gate keeps its own
+29-second budget and skips a Jev call it has no time to finish.
 
 ## What it writes
 
-Every ask and every block are recorded: a JSONL decision line at
-`~/.jev-gates/gate1.jsonl`, and a SARIF finding in the shared store so a
-later gate can see it - same shape as every other gate.
+Every decision the gate reaches is logged as a JSONL line at
+`~/.jev-gates/gate1.jsonl`, allows included. An ask or a block also
+writes a SARIF finding to the shared store, so a later gate can see it,
+when the hook payload carries a `session_id`. Nothing is logged when the
+gate is off or the tool is not `ExitPlanMode`.
 
 ## How to run it
 
@@ -152,15 +160,19 @@ The hook is wired in `hooks/hooks.json` at the repository root, matched
 on `ExitPlanMode`. To check it by hand:
 
 ```console
-echo '{"tool_name":"ExitPlanMode","tool_input":{"plan":"Fix the crash in `README.md`."}}' \
-    | python skills/plan-gate/scripts/plan_gate.py
+echo '{"tool_name":"ExitPlanMode","tool_input":{"plan":"Build the export flow. TODO: pick the API shape."}}' \
+    | GATE1_ENABLED=1 python skills/plan-gate/scripts/plan_gate.py
 ```
+
+This prints a deny, because the plan still holds a `TODO`. It makes no
+Jev call and appends one line to the decision log. The gate is off
+unless `GATE1_ENABLED` is set, and an allowed plan prints nothing.
 
 `--selfcheck` is fully offline - every path that could reach the
 Jev-judged tier mocks `jevgate.api_key`/`call_jev`, same discipline every
-other gate's own selfcheck uses. `eval_gate1.py` is **not** offline for
-its one `judged` case: that plan clears every deterministic check and
-reaches a real Jev call.
+other gate's own selfcheck uses. `eval_gate1.py` is **not** offline.
+Three of its cases clear the deterministic floor and reach a real Jev
+call: the two soft-flag asks and the `judged` case.
 
 ```console
 python skills/plan-gate/scripts/plan_gate.py --selfcheck
@@ -171,33 +183,40 @@ python skills/plan-gate/scripts/eval_gate1.py
 
 | Variable | Meaning |
 | --- | --- |
-| `GATE1_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. |
+| `GATE1_ENABLED` | **Off unless set.** `1`, `true`, `yes` or `on` switches the gate on. `install.py` sets it to `1` when it is absent and never overwrites it. A plugin install through `hooks/hooks.json` sets nothing, so set it yourself there. |
 | `GATE1_LOG` | Where the JSONL decision log goes. Defaults to `~/.jev-gates/gate1.jsonl`. |
-| `GATE1_PRINCIPLES_FILE` | Path to a MUST-line principles file for D7. Defaults to `PRINCIPLES.md` in the plan's `cwd`. Not present in this repository today - see "Known gaps". |
+| `GATE1_PRINCIPLES_FILE` | Path to a MUST-line principles file for D7. Defaults to `PRINCIPLES.md` in the plan's `cwd`. With neither present, D7 does nothing - see "Known gaps". |
 | `JEV_FINDINGS_DIR` | Where the shared finding store lives. Defaults to `~/.jev-gates/findings`. Same store every other gate already uses. |
 
 ## Status: built (2026-09-24), adversarially reviewed and fixed same day
 
 The eval is 10 cases, stored baseline at `evals/baseline/gate1.json`,
 passing 10/10: one D0 trivial-class allow, one empty-plan ask, five
-deterministic-floor denies (D1, D2, D4, D5, D9), two soft-flag asks (D3,
-D6), and one `judged` case that clears every deterministic check and
-makes a real Jev call, verified genuine by checking the logged `j_probs`
-field rather than a rule-name allowlist.
+deterministic-floor denies (D1, D2, D4, D5, D9), one D3 soft-flag ask,
+one case named for D6, and one `judged` case that clears every
+deterministic check and makes a real Jev call, verified genuine by
+checking the logged `j_probs` field rather than a rule-name allowlist.
 
-**Adversarial review found and fixed seven real defects** the day it was
-built: a missing `plan` field on `ExitPlanMode` silently allowed with no
-decision emitted at all (the most severe - a complete, silent bypass);
-D5's edit-verb detection both false-blocked a legitimate file-creation
-plan and missed real edits phrased with a noun between the verb and the
-path, and separately let an earlier file's edit verb bleed across a
-comma onto an unrelated later file in the same sentence; D9 accepted an
-override with every field label present but its value left blank; the
-eval's own `JUDGED_RULES` allowlist could pass a case as "judged" when
-Jev was never actually reached; D0's new-dependency check missed every
-package manager but npm/pip and its path count ignored any file not
-wrapped in backticks; a plan over the Jev call's character window was
-silently truncated and judged clean on its head alone; and D2's
+The case named for D6 does not fire D6. Its plan names `eval_gate1.py`,
+and D6 counts any `eval_*.py` file as a proof file, so the plan clears
+D6 and reaches Jev. It passes only because Jev answers ask. The stored
+baseline shows rule `jev-judged-low-stack-confidence`. D6 itself is
+covered offline by `--selfcheck`.
+
+**Adversarial review found seven real defects** the day it was built,
+and the gate's own selfcheck found an eighth. All eight are fixed. A
+missing `plan` field on `ExitPlanMode` silently allowed with no decision
+emitted at all (the most severe, a complete, silent bypass). D5's
+edit-verb detection both false-blocked a legitimate file-creation plan
+and missed real edits phrased with a noun between the verb and the path.
+D5 also let an earlier file's edit verb bleed across a comma onto an
+unrelated later file in the same sentence (the one the selfcheck found).
+D9 accepted an override with every field label present but its value
+left blank. The eval's own `JUDGED_RULES` allowlist could pass a case as
+"judged" when Jev was never actually reached. D0's new-dependency check
+missed every package manager but npm/pip, and its path count ignored any
+file not wrapped in backticks. A plan over the Jev call's character
+window was silently truncated and judged clean on its head alone. D2's
 placeholder check flagged ordinary HTML tags and generic type
 parameters. See the "adversarial review, 2026-09-24" comments at each
 fix site in `plan_gate.py`/`eval_gate1.py` for the exact before/after.

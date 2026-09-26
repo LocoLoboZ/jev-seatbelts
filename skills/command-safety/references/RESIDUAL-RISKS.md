@@ -21,7 +21,7 @@ Posture values used below:
 
 | Posture | Meaning |
 | --- | --- |
-| `escalates` | The gate cannot resolve it, so it asks. Not a bypass, a cost. |
+| `escalates` | The gate cannot resolve it, so Jev judges it, and with no key or no answer it is denied. Only a parse failure or a cap asks the human. Not a bypass, a cost. |
 | `accepted` | Known gap. Not closed, and not planned to be. |
 | `open` | Known gap that should be closed, with the shape of the fix noted. |
 
@@ -29,9 +29,11 @@ Posture values used below:
 
 **RR-1. A dangerous command reached by an interpreter body. `escalates`.**
 `python -c "import os; os.system('rm -rf /')"`. The gate cannot read the
-body, so it asks rather than deciding. Every interpreter with `-c`, `-e` or
-`--eval` lands here, which makes the ask rate higher than a guesser's would
-be. That is the trade, taken deliberately.
+body, so Jev judges it rather than the floor deciding. Every interpreter
+with `-c` or `--eval` lands here, and so does `-e` for perl, ruby, node,
+deno, bun, php and PowerShell. `bash -e` is not code, it means stop on
+error. This sends more commands to Jev than a guesser would. That is the
+trade, taken deliberately.
 
 **RR-2. A verb that arrives from stdin. `escalates`.**
 `ls | xargs rm -rf`, `parallel rm -rf ::: a b`, `find . -exec rm {} +`. The
@@ -58,21 +60,24 @@ time. Nothing readable from a hook closes this.
 
 **RR-6. A dangerous command with a target this gate does not know is
 precious. `accepted`.**
-`rm -rf /srv/customer-data` is an ask, not a deny, because the gate has no
-model of which directories matter. The catastrophic list is machine-scope
+`rm -rf /srv/customer-data` goes to Jev as `delete-recursive` rather than
+being denied by the floor, because the gate has no model of which
+directories matter. The catastrophic list is machine-scope
 paths only. Sizing that list from the actual filesystem was rejected: a gate
 whose verdicts depend on the machine it runs on cannot be evaluated.
 
-**RR-7. SQL arriving from a file or from stdin. `open`.**
+**RR-7. SQL arriving from a file or from stdin. `accepted`.**
 `psql -f drop.sql` and `mysql < drop.sql` are not detected. The SQL family
 reads the parsed words and is scoped to a known database client. Closing
-this means reading the file, which RR-4 already rules out for the same
-reason.
+this would mean reading the file, which RR-4 already rules out for the
+same reason.
 
 **RR-8. Windows-shell syntax. `escalates`.**
 PowerShell tool calls are read as PowerShell since 2026-09-26. See RR-18
 for what that reader covers and what still escapes it. `cmd.exe` syntax is
-not read: `cmd /c ...` goes to Jev as a command this gate cannot read.
+not read. `cmd /c ...` and `cmd /k ...` go to Jev as a command this gate
+cannot read, from the Bash tool as well as the PowerShell tool, including
+the `cmd //c` form Git Bash uses.
 
 **RR-9. Anything past a cap. `escalates`.**
 Over 8,000 characters, 400 words, 60 segments or 6 levels of nesting, the
@@ -93,9 +98,10 @@ call is two allowed steps. Per-call gating cannot see a plan.
 **RR-12. A deny is advice, not enforcement. `accepted`.**
 The decision is a JSON permission decision returned to Claude Code. If the
 hook is not registered, is switched off, or the harness changes its
-contract, nothing is enforced. This is why the enable state is printed in
-the gate's own log and why the README says plainly that installing this
-gives no protection until it is switched on.
+contract, nothing is enforced. `install.py` switches the gate on, but a
+plugin install from `hooks/hooks.json` leaves it off until
+`GATE3_ENABLED` is set, and a gate that is off logs nothing. Run
+`python lib/gate_status.py --status` to see which gates are on.
 
 **RR-13. Semantic judgement only where the floor flags. `open`.**
 Our own probe scored a recursive delete of a real documents directory, with
@@ -164,7 +170,7 @@ anticipated, not what survived contact. Counter-examples are wanted: see
 `SECURITY.md` at the repository root for how to report one privately.
 
 **What one review already found, so this is not theoretical.** An
-independent Codex review of the first build reproduced twelve defects,
+independent review of the first build reproduced twelve defects,
 including a critical fail-open on import (exit 1, which means the command
 runs), seven ways to hide `rm -rf /` from the classifier, and four false
 blocks on ordinary work. All twelve were reproduced locally, fixed, and

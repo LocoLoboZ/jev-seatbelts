@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-"""Gate 4, phase 1: a Claude Code PreToolUse hook that screens a commit's
+"""Gate 4: a Claude Code PreToolUse hook that screens a commit's
 staged diff for a hardcoded secret before the commit runs.
 
-This is the deterministic floor only - no Jev call yet. Per
+Phase 1 below is the deterministic floor. Phase 2 (further down) adds one
+Jev call. Per
 reference/DESIGN-BASIS.md, "Gate 4 (commit screening) - fail open to a
 local regex secret scan": when Jev is unreachable, Gate 4 as a whole falls
 back to exactly what this file is. Phase 2 (a Jev call for secret/backdoor
@@ -13,14 +14,16 @@ review) builds on top of this file rather than replacing it.
         | python commit_screening.py
     python commit_screening.py --selfcheck    # offline assertions, no git call
 
-WHAT THIS DOES. Fires only on a Bash tool call whose command contains a
-`git commit` (any flags, including --amend). Reads the STAGED diff at the
+WHAT THIS DOES. Fires on a Bash tool call whose command contains a
+`git commit` (any flags, including --amend), and on a PowerShell tool call
+whose text names git then commit. Reads the STAGED diff at the
 hook's own `cwd` (`git diff --cached`, or `git diff HEAD` when `-a`/`--all`
 is present, since that flag auto-stages tracked changes as part of the
 commit itself rather than before it) and scans only the ADDED lines against
 a small set of high-confidence, named secret shapes (an AWS access key id,
 a GitHub/GitLab token, a Slack token, a Stripe live key, a Google API key,
-an npm token, a PEM private-key block). A match denies the commit outright.
+an npm token, a TypeSafe, Anthropic or OpenAI project key, a PEM
+private-key block - see SECRET_PATTERNS). A match denies the commit outright.
 No match, or no commit detected at all, is silent allow.
 
 WHAT THIS IS NOT. It does not scan the commit message, and does not detect
@@ -579,8 +582,7 @@ def decide(command, cwd, budget=None, session_id=None):
                        secret_p=secret_p, risk_p=risk_p)
     if prior_lines:
         # P12's deterministic floor: Jev was not reachable (no key, no
-        # budget, a failed call) or was reachable and came back clean, but
-        # Gate 3 raised at least one caution earlier this session that this
+        # budget, a failed call), but Gate 3 raised at least one caution earlier this session that this
         # gate would otherwise never surface. Allow (the diff itself is
         # clean by every check this gate can run) but flag for review,
         # same shape as jev-risk-tier, rather than inventing a deny this

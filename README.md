@@ -44,19 +44,10 @@ review history - nothing here is a marketing number.
 | What was checked | Result |
 | --- | --- |
 | Automated test scenarios, all 7 gates combined | 176 / 176 passing (100%) |
-| Independent adversarial review rounds on the highest-risk gate (command safety) | 11 rounds, converging to zero findings |
-| Findings from the most recent independent review, confirmed real and fixed before merge | 5 of 6 flagged issues |
-| Commits from first line to today, no single mega-commit hiding the work | 121 |
-| Gate still awaiting a real production track record before its threshold is trusted | 1 of 7 (Gate 7 - flagged honestly below, not buried) |
+| Independent adversarial review rounds on the highest-risk gate (command safety) | 11 rounds, and later reviews still find real defects, which are fixed before release |
+| Gate whose score cannot yet tell a right block from a wrong one | 1 of 7 (Gate 7 - flagged honestly below, not buried) |
 
 "She'll be right" is not a test result. These are.
-
-![Real findings per independent review round, Gate 3](docs/images/review-findings-trend.svg)
-
-The riskiest gate's review history, round by round, real bug count
-each time: 8, then 2, then 1, then nothing, nothing, nothing. Not a
-one-shot pass - a trend, driven down by fixing what each round
-actually found.
 
 ## Status
 
@@ -71,20 +62,30 @@ print, but it's short, and none of it is hidden in a footnote.
 | 4 Commit screening | A hardcoded secret or backdoor-looking diff about to be committed | Built, both phases |
 | 5 Debug triage | A guessed fix tried without a falsifiable root-cause hypothesis | Built (the one phase that needs a model call, the rest of the discipline is unscripted process). Plus a no-model stall check hook that warns when three edits in a row leave the same test failure unchanged |
 | 6 Code quality | Sloppy work that still compiles - measures, never blocks | Built, adversarially reviewed |
-| 7 Completion check | A "done"/"tests pass" claim with no fresh evidence behind it | Built. **Threshold is a placeholder, not calibrated - see below** |
+| 7 Completion check | A "done"/"tests pass" claim with no fresh evidence behind it | Built. **Threshold checked against real history and kept, but the score separates right from wrong blocks poorly - see below** |
 
-- **Every gate is off until you switch it on.** Installing this does
-  nothing on its own, like a smoke alarm still in the box. Each gate
-  waits for its own `GATEn_ENABLED` environment variable. Set the ones
-  you want:
-  `GATE1_ENABLED`, `GATE2_ENABLED`, `GATE3_ENABLED`, `GATE4_ENABLED`,
-  `GATE6_ENABLED`, `GATE7_ENABLED`. Gate 5's ranker has no hook - see its
-  own `SKILL.md` - but its stall check does: `GATE5_STALL_ENABLED`.
-- **Gate 7's threshold is a guess, not a fitted number.** The 0.75
-  block / 0.50 warn placeholders have not been calibrated against real
-  history yet. In the baseline run, one failing case scored exactly on
-  the threshold. Run `skills/completion-check/references/CALIBRATION.md`
-  before trusting Gate 7 to block anything real.
+- **`install.py` switches every gate on.** Each gate reads its own
+  environment variable: `GATE1_ENABLED`, `GATE2_ENABLED`,
+  `GATE3_ENABLED`, `GATE4_ENABLED`, `GATE6_ENABLED`, `GATE7_ENABLED`,
+  plus `GATE5_STALL_ENABLED`, `GATE7_SELFTUNE_ENABLED` and
+  `DRIFTGUARD_ENABLED`. `install.py` sets each one to `1` unless you
+  already set it, so a flag you set to `0` stays off. A plugin install
+  from `hooks/hooks.json` sets nothing, so there every gate stays off
+  until you set its variable. Gate 5's ranker (`GATE5_ENABLED`) has no
+  hook and is never switched on for you - see its own `SKILL.md`. Run
+  `python lib/gate_status.py --status` to see which gates are on.
+- **With no key, Gate 3 denies what it cannot read.** Gate 3 is on after
+  `install.py`. Its fixed floor needs no key, but a command its parser
+  cannot resolve goes to Jev, and with no key that command is denied, not
+  asked. Expect some ordinary but unusual commands to be refused until a
+  key is set. See "Requirements".
+- **Gate 7's threshold is checked, not fitted.** The 0.75 block / 0.50
+  warn values were checked once against real, human-labelled stops on
+  2026-09-26 and kept. On that data the score for a right block and a
+  wrong block overlapped almost completely (held-out AUROC 0.50 for the
+  main blocking rule). Read
+  `skills/completion-check/references/CALIBRATION.md` before trusting
+  Gate 7 to block anything real.
 - **Gate 2 only knows public registries.** A private or internal package
   looks identical to a hallucinated one to a registry lookup - it will be
   denied too. See `skills/package-check/SKILL.md`, "Known gaps".
@@ -124,9 +125,9 @@ python install.py
 Adds the seven gates and the drift check as hooks in your global
 `~/.claude/settings.json`, alongside whatever is already there - nothing
 else is changed, though this plugin's own entries move to the end of each
-hook event when they are refreshed. Every gate stays off until you set its
-own `GATEn_ENABLED` variable (see "Status" above). Safe to run more than
-once: it adds only the hooks and flags not already there, so re-running
+hook event when they are refreshed. It also sets every gate's enable
+variable to `1` unless you already set it (see "Status" above). Safe to
+run more than once: it adds only the hooks and flags not already there, so re-running
 after an upgrade picks up a newly added gate, and a flag you set to 0
 stays 0.
 
@@ -169,10 +170,10 @@ own evidence, before trusting either.
 - A [TypeSafe](https://typesafe.ai) Jev API key, needed by the gate evals
   that make live calls and by every gate's Jev-judged tier once its
   `GATEn_ENABLED` is set. The offline checks below need no key and no
-  network. With no key found, every gate logs the gap and fails open, with
-  one exception: Gate 3's fixed floor needs no key, but a command that
-  reaches its Jev-judged tier is denied when no judgement can be had
-  (set `GATE3_JEV_FAIL_OPEN=1` to change that).
+  network. With no key found, every gate logs the gap and falls back to
+  its fixed checks alone, with one exception: Gate 3's fixed floor needs
+  no key, but a command that reaches its Jev-judged tier is denied when
+  no judgement can be had (set `GATE3_JEV_FAIL_OPEN=1` to change that).
 
 The key is read from `TYPESAFE_API_KEY`, or on Windows from the user
 registry when a hook does not inherit user variables. No key is stored in
@@ -186,7 +187,7 @@ this repository.
 | `lib/jevgate.py` | Shared plumbing every gate uses: key lookup, transcript parsing, thresholds, the Jev call with retry, logging, session-wide call budget |
 | `lib/bashparse.py` | The quote-aware shell reader behind Gate 3: word provenance, lifted substitutions, caps that fail closed |
 | `lib/psparse.py` | The PowerShell reader behind Gate 3: turns a PowerShell command into the same pieces `bashparse.py` produces, and refuses what it cannot read |
-| `lib/findings.py` | The shared SARIF finding store. Gates 3, 4, 5 and 6 write to it, Gate 7 reads it |
+| `lib/findings.py` | The shared SARIF finding store. Gates 1 to 6 and the bypass write to it, Gate 7 reads it |
 | `lib/evalharness.py` | Runs a gate's eval cases, stores a dated result, diffs against the stored baseline |
 | `lib/gatelog.py` | Adjudicates logged gate decisions and computes escape rate and false-block rate |
 | `lib/gate_status.py` | Which gates are enabled, and one session's Jev-reachability + call-budget state |

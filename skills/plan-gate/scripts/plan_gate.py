@@ -10,7 +10,7 @@ or silently expands scope, because intent and stack choice are two
 artefacts with two quality bars. The amended design instead builds one
 plan-stage gate: deterministic work-class triage first (a one-line fix or
 a named-symptom repair passes with no model call at all), then, only for
-the feature class, ten deterministic checks (D0-D9) and exactly one Jev
+the feature class, eight deterministic checks (D1-D7, D9) and exactly one Jev
 call carrying five judgement fields (J1-J5), one of which is the old
 Gate 1's stack-confidence question. Gate count stays at seven.
 
@@ -21,7 +21,7 @@ Gate 1's stack-confidence question. Gate count stays at seven.
 WHAT THIS DOES. Fires on `ExitPlanMode`, the only point in a Claude Code
 session where the whole plan exists as one piece of text before any file
 is touched. D0 classifies the plan as trivial (pass, no model call) or
-feature (the checks below run). D1/D2/D4/D5/D9 are a fixed deterministic
+feature (the checks below run). D1, D2, D4, D9 then D5 are a fixed deterministic
 floor that can deny outright. D3/D6/D7 are softer deterministic signals
 that can only ask for clarification, never deny alone. J1-J5 are one Jev
 call, judged only after the deterministic floor is clear, following the
@@ -387,11 +387,9 @@ def check_d6(text):
 
 # --- D7: MUST lines in a declared principles file (ask) --------------------
 #
-# No principles file is declared in this project yet (P12's built
-# resolution reused the shared finding store instead - see
-# reference/DESIGN-BASIS.md, "P12 built"), so this check is a no-op
-# until one exists. Forward-looking infrastructure, not a promise this
-# repository currently keeps.
+# Reads PRINCIPLES.md in the plan's working directory, or the file
+# named by GATE1_PRINCIPLES_FILE. With neither present, this check does
+# nothing.
 
 _MUST_WORD_RE = re.compile(r"\bMUST\b")
 _STOP_WORDS = frozenset(("must", "shall", "should", "which", "their",
@@ -994,4 +992,21 @@ def selfcheck():
 if __name__ == "__main__":
     if "--selfcheck" in sys.argv:
         sys.exit(selfcheck())
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001
+        # Exit 1 would mean neither allow nor block. Answer ask instead,
+        # the same as Gates 3 and 4 - bad stdin included.
+        try:
+            jevgate.hook_error(GATE, f"unhandled: {type(exc).__name__}: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+        if os.environ.get("GATE1_DEBUG"):
+            import traceback
+            traceback.print_exc()
+        try:
+            sys.exit(finish(Verdict(ASK, "internal-error",
+                                    "Gate 1 failed internally, so this "
+                                    "plan is not resolved."), "", time.time()))
+        except Exception:  # noqa: BLE001
+            sys.exit(_bare_ask("failed even while reporting failure."))
