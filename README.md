@@ -62,6 +62,10 @@ The riskiest gate's test suite grew as each review found a new way to
 write a dangerous command. Each new trick became a test case, and every
 stored baseline passed all of its cases.
 
+`python evals/make_charts.py` redraws both charts. The runs chart needs
+the saved runs in `evals/results`, which are not in git, so a fresh clone
+can redraw only after it runs the evals.
+
 ## Status
 
 All seven gates are built. Read this before installing - it's the fine

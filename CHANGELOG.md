@@ -45,6 +45,8 @@ came out of it.
 - **Two test charts replace it.** Drawn from the 214 eval runs saved
   during the build: runs per gate, with any failures shown, and Gate 3's
   test cases growing from 69 to 128.
+- **The chart script is in the repo.** `evals/make_charts.py` redraws
+  both charts. The runs chart needs local runs in `evals/results`.
 - **Every gate's docs now match its code.** All seven `SKILL.md` files,
   their reference files, `SECURITY.md`, `CONTRIBUTING.md`, the design
   notes, and the `hooks.json` and `plugin.json` descriptions were checked
