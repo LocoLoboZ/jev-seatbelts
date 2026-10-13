@@ -207,7 +207,7 @@ skill, per the trigger description above, the same way
 **One hook after all: the stall check (2026-09-26).** There is still no
 event for "a debugging session began", but there is one for its most
 common failure: edit, re-run, same failure. `scripts/stall_check.py` runs
-on `PostToolUse` for Bash and edit tools, fingerprints each failing
+on `PostToolUse` for Bash, PowerShell and edit tools, fingerprints each failing
 test-like run (last 40 lines, digits and hex masked), and when the same
 fingerprint returns three times with an edit in between it tells the
 agent, via `additionalContext`, to stop guessing and come back here. No

@@ -74,6 +74,10 @@ enough to run on every stop.
 - The eval builds a throwaway git repository with one committed file and one
   uncommitted edit, so every case sees the same `git status` and `git diff`
   evidence. It is one fixed tree, not a tree matching each scenario.
+- The block or allow answer cannot show whether a `[stated]` rule fired,
+  because those rules never block. The result file records the rules that
+  warned for each case under `warned`, for reading only. Which rules each case
+  exercises, and which have no case, is in `TRACEABILITY.md`.
 
 ## History
 

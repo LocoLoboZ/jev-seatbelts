@@ -165,3 +165,4 @@ adds automatic labels from the human's next reply.
 - `references/CALIBRATION.md` - fitting thresholds to our own history
 - `references/PROVENANCE.md` - the third-party adoption check for `limpet`
 - `references/EVAL.md` - the before/after test results
+- `references/TRACEABILITY.md` - which rule each eval case exercises, and the gaps

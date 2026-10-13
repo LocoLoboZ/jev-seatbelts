@@ -2,6 +2,26 @@
 
 What changed, in plain words. Newest first.
 
+## 2026-10-13
+
+One hook change and some test tooling and docs. No gate verdict changed.
+
+- **Gate 5 stall check watches PowerShell too.** The PostToolUse hook now
+  matches the PowerShell tool, so test runs there count as well. `install.py`
+  and `hooks/hooks.json` carry the same match. This change landed on
+  2026-09-27.
+- **The eval harness records which rules warned.** `lib/evalharness.py`
+  now saves a `warned` list for each case in its result file and notes when
+  it changes against a baseline. It is read only. A warn never fails a run,
+  and no verdict changed. The Gate 7 eval still passes 9 of 9.
+- **Gate 7 rules are traced to eval cases.**
+  `skills/completion-check/references/TRACEABILITY.md` lists which rule each
+  case exercises. R6 has no case, R7 has no case built to break it, and the
+  warn-only rules R4 to R7 cannot be seen in the block or allow answer.
+- **A stale comment is fixed.** The `lib/driftguard.py` header said it was
+  not wired in. `lib/driftcheck_hook.py` has wired it in as a session-start
+  probe since 2026-09-23.
+
 ## 2026-09-26
 
 The Windows update. If your agent lives in PowerShell, the seatbelt now

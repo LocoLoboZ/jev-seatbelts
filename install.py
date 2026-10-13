@@ -54,7 +54,7 @@ PRETOOLUSE = [
         "jev-seatbelts Gate 6: measuring code quality")]},
 ]
 POSTTOOLUSE = [
-    {"matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit", "hooks": [_hook(
+    {"matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit", "hooks": [_hook(
         "skills/debug-triage/scripts/stall_check.py", 10,
         "jev-seatbelts Gate 5: stall check")]},
 ]

@@ -19,10 +19,11 @@ UNKNOWN means for its own situation, the same as every other gate's own
 fail-open/fail-closed choice already does. This module makes no gating
 decision of its own.
 
-Not wired into any gate's own live call path yet - this is the primitive,
-gate-agnostic and opt-in, the way `pattern_sizer.py`'s Jev-assisted mode is
-opt-in. See reference/DESIGN-BASIS.md for what wiring it in would mean for
-pipeline gap P8, which this narrows but does not close by itself: P8 is a
+Not part of any gate's own call path - this is the primitive, gate-agnostic
+and opt-in, the way `pattern_sizer.py`'s Jev-assisted mode is opt-in.
+lib/driftcheck_hook.py wires it in as a once-per-session SessionStart probe
+(see reference/DESIGN-BASIS.md, "P8 built"), which narrows pipeline gap P8
+but does not close it by itself: P8 is a
 model-version bump moving every gate's *calibrated threshold*, which this
 cannot see, since a sanity probe's own threshold (0.5) is not calibrated
 against anything, deliberately - it only needs to separate "obviously one

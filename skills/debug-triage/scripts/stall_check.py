@@ -7,8 +7,8 @@
 WHAT THIS DOES. The guessed-fix loop has one observable signature: the
 agent edits, re-runs the same test command, and gets the same failure,
 again and again. This hook fingerprints the tail of each failing
-test-like Bash run (digits and hex masked, so timings and line numbers
-do not count as change) and counts how many times that same fingerprint
+test-like Bash or PowerShell run (digits and hex masked, so timings and
+line numbers do not count as change) and counts how many times that same fingerprint
 comes back with an Edit/Write in between. At STALL_AT it tells the agent,
 via additionalContext, to stop guessing and debug. It never blocks and
 never calls Jev: the evidence is exact, so a model adds nothing but cost.
@@ -85,7 +85,7 @@ def step(state, tool, tool_input, tool_response):
     if tool in EDIT_TOOLS:
         state["edited"] = True
         return state, None
-    if tool != "Bash":
+    if tool not in jevgate.SHELL_TOOLS:
         return state, None
     cmd = " ".join(str((tool_input or {}).get("command") or "").split())
     if not TEST_CMD_RE.search(cmd):
@@ -168,6 +168,9 @@ def selfcheck():
     assert step({}, "Bash", run, ok)[1] is None
     assert step({}, "Bash", run, {"stdout": "5 passed, 0 failed"})[1] is None
     assert step({}, "Read", {}, None)[1] is None
+    # The PowerShell tool returns the same stdout/stderr shape as Bash.
+    ps = ("PowerShell", run, fail)
+    assert play([ps, edit, ps, edit, ps]) == 3
     # Garbage input never raises.
     assert step({}, "Bash", None, "not a dict")[1] is None
 
