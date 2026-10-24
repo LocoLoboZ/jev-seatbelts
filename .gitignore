@@ -9,3 +9,6 @@ __pycache__/
 
 # Local Codex CLI hook wiring, machine-specific paths, never shipped.
 .codex/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

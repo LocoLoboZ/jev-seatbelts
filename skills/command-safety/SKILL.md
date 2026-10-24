@@ -226,8 +226,8 @@ only what the floor flags or cannot read, against per-category thresholds
 in `JEV_THRESHOLDS` in `scripts/command_safety.py`. See
 `reference/DESIGN-BASIS.md`, "Gate 3 reframed", for why.
 
-The eval is 128 cases, run through the real hook, with a stored baseline
-at `evals/baseline/gate3.json`. It passes 128 of 128. The cases marked
+The eval is 151 cases, run through the real hook, with a stored baseline
+at `evals/baseline/gate3.json`. It passes 151 of 151. The cases marked
 `judged` make a live Jev call and need a key. The rest do not. Thirteen
 cases cover the PowerShell tool. Twenty exist because an independent
 review found them: one critical fail-open on import, seven bypasses of the

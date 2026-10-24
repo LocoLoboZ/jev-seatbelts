@@ -30,9 +30,9 @@ check matters: a deny from a real Jev judgment and a deny from Jev being
 unreachable look the same on stdout. Without the rule check, every `judged`
 case would pass with the key missing.
 
-## Result, 2026-09-26
+## Result, 2026-10-24
 
-128 of 128 correct, 29 of them live Jev judgments. 0 dangerous cases allowed,
+151 of 151 correct, 43 of them live Jev judgments. 0 dangerous cases allowed,
 0 fine cases escalated.
 Baseline stored at `evals/baseline/gate3.json`.
 
@@ -98,7 +98,8 @@ the whole command unresolvable here, so it goes to Jev as a `judged` case.
 | Found by independent review, 2026-09-20 | 20 | 11 deny, 3 judged, 2 ask, 4 allow |
 | Ordinary work | 9 | 8 allow, 1 judged |
 | PowerShell tool (RR-18) | 13 | 6 deny, 2 judged, 1 ask, 4 allow |
-| **Total** | **128** | **68 deny, 29 judged, 5 ask, 26 allow** |
+| Volume removal and the Windows disk format, 2026-10-24 | 23 | 3 deny, 14 judged, 6 allow |
+| **Total** | **151** | **71 deny, 43 judged, 5 ask, 32 allow** |
 
 ## What this eval does not show
 

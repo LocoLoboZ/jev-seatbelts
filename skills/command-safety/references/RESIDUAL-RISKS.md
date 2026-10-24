@@ -164,6 +164,13 @@ any word built at run time. What is not seen at all, and stays `open`:
 - `Move-Item` away from a protected file is not a write to it, the same gap
   `mv` has in Bash.
 
+**RR-19. Jev can allow a volume prune. `open`.**
+Found 2026-10-23: `docker volume prune` is judged by the floor, and Jev
+allowed it. A prune deletes every unused volume and its data. The floor
+cannot deny it outright without also blocking the cleanups it is meant
+for. Moving it to a floor deny, or raising the `container-force-remove`
+threshold, waits for an escape rate and a false-block rate (EVAL.md).
+
 **RR-15. Every one of these is written from our own reading. `open`.**
 No adversary has tested this gate. The register records what was
 anticipated, not what survived contact. Counter-examples are wanted: see

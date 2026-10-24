@@ -737,6 +737,14 @@ def _catastrophic(verb, args, seg):
     if verb.startswith("mkfs") or verb == "wipefs":
         return Verdict(DENY, "format-filesystem",
                        f"`{verb}` destroys a whole filesystem.", HARD_STOP)
+    # The Windows disk command, which Git Bash can run as well. The
+    # PowerShell path has its own copy of this in _ps_catastrophic.
+    base = posixpath.basename(verb.replace("\\", "/")).lower()
+    if base in ("format", "format.com", "format.exe") and any(
+            re.match(r"^[a-z]:[\\/]?$", a.text.lower()) for a in args):
+        return Verdict(DENY, "format-filesystem",
+                       f"`{verb}` destroys a whole disk or volume.",
+                       HARD_STOP)
     ops = _operands(args)
     if verb == "shred" and any(o.text.startswith("/dev/") for o in ops):
         return Verdict(DENY, "wipe-device", "Wiping a block device.",
@@ -900,6 +908,10 @@ def _kubectl_resource(following):
     return ""
 
 
+# Docker's own rule for a volume name.
+_VOLUME_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+
+
 def _container(name, args):
     texts = [a.text for a in args]
     # `docker compose` (v2 plugin, one binary with a subcommand) and
@@ -946,7 +958,27 @@ def _container(name, args):
         if texts[:1] in (["rm"], ["rmi"]) and "-f" in texts:
             return Verdict(ASK, "container-force-remove",
                            "Force-removing containers or images.", SCOPE_DOWN)
-        if texts[:2] == ["volume", "rm"]:
+        # Found anywhere, not only first: a global flag such as
+        # `--context x` before it, or the `remove` alias, hid it before.
+        # Only where docker's own subcommand sits: everything before it is
+        # a flag or the value right after one, so `docker run img printf
+        # volume rm` is not read as a volume removal.
+        at = next((i for i in range(len(texts) - 1)
+                   if texts[i] == "volume" and texts[i + 1] in ("rm", "remove")
+                   and all(t.startswith("-") or (j and texts[j - 1][:1] == "-"
+                                                 and "=" not in texts[j - 1])
+                           for j, t in enumerate(texts[:i]))),
+                  None)
+        if at is not None:
+            # Every target named as a plain literal docker volume name: the
+            # command already says exactly what goes, so there is nothing
+            # left to scope down. The name pattern also refuses flags, brace
+            # expansion and $'...' words, which bashparse calls literal but
+            # bash rewrites. Anything else is still judged.
+            names = args[at + 2:]
+            if names and all(a.literal and _VOLUME_NAME.fullmatch(a.text)
+                             for a in names):
+                return None
             return Verdict(ASK, "container-force-remove",
                            "Removing a volume deletes its data.", SCOPE_DOWN)
     return None
@@ -1859,7 +1891,7 @@ def selfcheck():
                     "git -C /tmp/repo reset --hard",
                     "git -c user.name=x clean -fd",
                     "kubectl delete pod web-1", "docker system prune -a",
-                    "docker rm -f web", "docker volume rm data",
+                    "docker rm -f web", "docker volume rm -f data",
                     "terraform destroy -target=aws_instance.web",
                     'psql -c "DROP TABLE users"',
                     "rm -rf ~/my-node_modules", "rm -rf /var/node_modules_backup"):

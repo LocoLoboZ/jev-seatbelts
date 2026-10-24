@@ -2,6 +2,24 @@
 
 What changed, in plain words. Newest first.
 
+## 2026-10-24
+
+One Gate 3 change. It asks less about safe volume deletes and stops one
+disk wipe it used to miss.
+
+- **Gate 3 allows a plain `docker volume rm`.** A `docker` or `podman`
+  `volume rm` or `volume remove` is allowed when every name is a plain
+  literal volume name, because the command already says exactly what goes.
+  A forced, globbed, substituted, brace or `$'...'` form still goes to Jev.
+  No Jev threshold changed.
+- **Gate 3 denies the Windows disk format command.** `format` or
+  `format.com` with a drive letter, under Bash, is now a fixed deny. Inside
+  `cmd /c` it still goes to Jev (RR-8).
+- **A new open risk, RR-19.** Jev allowed `docker volume prune` in a test
+  run. A prune deletes every unused volume. It stays judged for now.
+- **The Gate 3 eval is 151 cases.** 23 new cases cover the above. It passes
+  151 of 151, and all 7 gates together pass 199 of 199.
+
 ## 2026-10-13
 
 One hook change and some test tooling and docs. No gate verdict changed.

@@ -43,7 +43,7 @@ review history - nothing here is a marketing number.
 
 | What was checked | Result |
 | --- | --- |
-| Automated test scenarios, all 7 gates combined | 176 / 176 passing (100%) |
+| Automated test scenarios, all 7 gates combined | 199 / 199 passing (100%) |
 | Independent adversarial review rounds on the highest-risk gate (command safety) | 11 rounds, and later reviews still find real defects, which are fixed before release |
 | Gate whose score cannot yet tell a right block from a wrong one | 1 of 7 (Gate 7 - flagged honestly below, not buried) |
 
