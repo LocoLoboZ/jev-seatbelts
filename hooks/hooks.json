@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/plan-gate/scripts/plan_gate.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/plan-gate/scripts/plan_gate.py\"",
             "timeout": 30,
             "statusMessage": "Gate 1 is checking the plan"
           }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/command-safety/scripts/command_safety.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/command-safety/scripts/command_safety.py\"",
             "timeout": 30,
             "statusMessage": "Gate 3 is checking the command"
           }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/commit-screening/scripts/commit_screening.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/commit-screening/scripts/commit_screening.py\"",
             "timeout": 30,
             "statusMessage": "Gate 4 is checking the commit"
           }
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/package-check/scripts/package_check.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/package-check/scripts/package_check.py\"",
             "timeout": 30,
             "statusMessage": "Gate 2 is checking the package"
           }
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/code-quality/scripts/code_quality.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/code-quality/scripts/code_quality.py\"",
             "timeout": 30,
             "statusMessage": "Gate 6 is measuring the commit's code quality"
           }
@@ -64,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/debug-triage/scripts/stall_check.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/debug-triage/scripts/stall_check.py\"",
             "timeout": 10
           }
         ]
@@ -75,7 +75,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/completion_check.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/completion_check.py\"",
             "timeout": 30,
             "statusMessage": "Gate 7 is checking the completion claim"
           }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/completion_check.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/completion_check.py\"",
             "timeout": 30,
             "statusMessage": "Gate 7 is checking the completion claim"
           }
@@ -99,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/lib/driftcheck_hook.py\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/lib/driftcheck_hook.py\"",
             "timeout": 30,
             "statusMessage": "Checking Jev's own judgment still looks right"
           }
@@ -109,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/gate7_selftune.py\" --if-due",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh\" \"${CLAUDE_PLUGIN_ROOT}/skills/completion-check/scripts/gate7_selftune.py\" --if-due",
             "timeout": 10
           }
         ]

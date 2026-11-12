@@ -1,6 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+# This launcher is read by POSIX sh and Git Bash.
+hooks/run-python3.sh text eol=lf
+
 # Media files - never text, never line-ending-normalized, always binary
 *.mp4 binary
 *.png binary
