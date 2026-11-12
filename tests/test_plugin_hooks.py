@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,13 @@ class PluginHookTests(unittest.TestCase):
         )
 
     def _run_hook(self, bin_dir):
+        bash = Path(bin_dir, "bash")
+        if not bash.exists():
+            self._write_executable(
+                bin_dir,
+                "bash",
+                'exec /bin/sh "$@"',
+            )
         env = os.environ.copy()
         env["PATH"] = str(bin_dir)
         env["CLAUDE_PLUGIN_ROOT"] = str(ROOT)
@@ -60,7 +68,7 @@ class PluginHookTests(unittest.TestCase):
         self.assertTrue(commands)
         self.assertTrue(all(
             command.startswith(
-                '"${CLAUDE_PLUGIN_ROOT}/hooks/run-python3" '
+                'bash "${CLAUDE_PLUGIN_ROOT}/hooks/run-python3.sh" '
             )
             for command in commands
         ))
@@ -76,6 +84,22 @@ class PluginHookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as bin_dir:
             self._python_wrapper(bin_dir, "python")
             result = self._run_hook(bin_dir)
+
+        self._assert_hook_passed(result)
+
+    def test_manifest_hooks_run_without_launcher_execute_bit(self):
+        launcher_ref = self._command().split('"')[1]
+        launcher = ROOT / launcher_ref.removeprefix(
+            "${CLAUDE_PLUGIN_ROOT}/"
+        )
+        original_mode = stat.S_IMODE(launcher.stat().st_mode)
+        try:
+            launcher.chmod(original_mode & ~0o111)
+            with tempfile.TemporaryDirectory() as bin_dir:
+                self._python_wrapper(bin_dir, "python3")
+                result = self._run_hook(bin_dir)
+        finally:
+            launcher.chmod(original_mode)
 
         self._assert_hook_passed(result)
 
