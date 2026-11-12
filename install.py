@@ -18,6 +18,7 @@ interpreter is running this installer - not a guess at "python" vs
 import argparse
 import json
 import os
+import re
 import sys
 
 SETTINGS = os.path.expanduser("~/.claude/settings.json")
@@ -75,6 +76,24 @@ SESSIONSTART = [{"hooks": [_hook(
 
 BLOCKS = {"PreToolUse": PRETOOLUSE, "PostToolUse": POSTTOOLUSE, "Stop": STOP,
           "SubagentStop": SUBAGENTSTOP, "SessionStart": SESSIONSTART}
+HOOK_COMMAND_RE = re.compile(r'^"[^"]+"\s+"([^"]+)"(?:\s|$)')
+
+
+def _script_path(command):
+    match = HOOK_COMMAND_RE.match(command)
+    if not match:
+        return None
+    return os.path.normcase(os.path.normpath(match.group(1)))
+
+
+OWN_HOOK_SCRIPTS = {
+    script
+    for entries in BLOCKS.values()
+    for entry in entries
+    for hook in entry["hooks"]
+    for script in [_script_path(hook["command"])]
+    if script is not None
+}
 
 
 def _load():
@@ -103,7 +122,7 @@ def _save(settings):
 
 
 def _is_ours(hook_entry):
-    return any(REPO + os.sep in h.get("command", "")
+    return any(_script_path(h.get("command", "")) in OWN_HOOK_SCRIPTS
                for h in hook_entry.get("hooks", []))
 
 

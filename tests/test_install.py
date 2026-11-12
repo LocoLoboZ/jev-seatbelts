@@ -2,7 +2,6 @@ from contextlib import redirect_stdout
 import io
 import json
 import os
-import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -11,13 +10,13 @@ import install
 
 
 class UninstallTests(unittest.TestCase):
-    def test_uninstall_preserves_hook_in_similarly_named_repository(self):
+    def test_uninstall_preserves_foreign_hook_using_project_virtualenv(self):
         foreign = {
             "matcher": "Bash",
             "hooks": [{
                 "type": "command",
                 "command": (
-                    f'"{sys.executable}" '
+                    f'"{os.path.join(install.REPO, ".venv", "bin", "python")}" '
                     f'"{install.REPO}-backup/custom_hook.py"'
                 ),
             }],
