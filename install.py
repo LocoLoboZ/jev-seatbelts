@@ -77,6 +77,7 @@ SESSIONSTART = [{"hooks": [_hook(
 BLOCKS = {"PreToolUse": PRETOOLUSE, "PostToolUse": POSTTOOLUSE, "Stop": STOP,
           "SubagentStop": SUBAGENTSTOP, "SessionStart": SESSIONSTART}
 HOOK_COMMAND_RE = re.compile(r'^"[^"]+"\s+"([^"]+)"(?:\s|$)')
+NORM_REPO = os.path.normcase(os.path.normpath(REPO))
 
 
 def _script_path(command):
@@ -94,6 +95,15 @@ OWN_HOOK_SCRIPTS = {
     for script in [_script_path(hook["command"])]
     if script is not None
 }
+
+
+def _inside_repo(path):
+    if path is None:
+        return False
+    try:
+        return os.path.commonpath((NORM_REPO, path)) == NORM_REPO
+    except ValueError:
+        return False
 
 
 def _load():
@@ -122,8 +132,14 @@ def _save(settings):
 
 
 def _is_ours(hook_entry):
-    return any(_script_path(h.get("command", "")) in OWN_HOOK_SCRIPTS
-               for h in hook_entry.get("hooks", []))
+    for hook in hook_entry.get("hooks", []):
+        script = _script_path(hook.get("command", ""))
+        if script in OWN_HOOK_SCRIPTS:
+            return True
+        if (_inside_repo(script)
+                and hook.get("statusMessage", "").startswith("jev-seatbelts")):
+            return True
+    return False
 
 
 def installed(settings):

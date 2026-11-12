@@ -10,7 +10,18 @@ import install
 
 
 class UninstallTests(unittest.TestCase):
-    def test_uninstall_preserves_foreign_hook_using_project_virtualenv(self):
+    def test_uninstall_removes_retired_hook_and_preserves_foreign_hook(self):
+        retired = {
+            "matcher": "Bash",
+            "hooks": [{
+                "type": "command",
+                "command": (
+                    f'"/old/python" '
+                    f'"{install.REPO}/skills/retired/scripts/retired.py"'
+                ),
+                "statusMessage": "jev-seatbelts retired hook",
+            }],
+        }
         foreign = {
             "matcher": "Bash",
             "hooks": [{
@@ -23,7 +34,7 @@ class UninstallTests(unittest.TestCase):
         }
         settings = {
             "hooks": {
-                "PreToolUse": [install.PRETOOLUSE[0], foreign],
+                "PreToolUse": [install.PRETOOLUSE[0], retired, foreign],
             },
         }
 
