@@ -103,7 +103,7 @@ def _save(settings):
 
 
 def _is_ours(hook_entry):
-    return any(REPO in h.get("command", "")
+    return any(REPO + os.sep in h.get("command", "")
                for h in hook_entry.get("hooks", []))
 
 
